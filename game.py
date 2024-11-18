@@ -3,13 +3,13 @@ import pickle
 
 from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
-# from board import Board
-# from movehistory import MoveHistory
-# from player import Player
+from board import Board
+from movehistory import MoveHistory
+from player import Player
 
 # repl parts modeled off notebooke example from
 
-class Game:
+class Game():
     """Display a menu and respond to choices when run."""
 
     def __init__(self, white_type="human", black_type="human", undo_redo="off", score="off"):
