@@ -155,7 +155,7 @@ class HeuristicAIPlayer(PlayerStrategy):
     #     pass
 
 class RandomAIPlayer(PlayerStrategy):
-    def getMove(self, board: Board) -> Move:
+    def getMove(self, board):
         """
         Randomly select a valid move from available moves
         """
@@ -164,7 +164,7 @@ class RandomAIPlayer(PlayerStrategy):
         return random.choice(possible_moves) if possible_moves else None
 
 class HumanPlayer(PlayerStrategy):
-    def getMove(self, board: Board, ) -> Move:
+    def getMove(self, board):
 
          # If no pieces can move, skip to era selection
         if not board.getValidMoves(self):
@@ -196,35 +196,37 @@ class HumanPlayer(PlayerStrategy):
     
     def _input_piece(self, board):
         while True:
-            piece_id = input("Select a copy to move\n").strip().upper()
-
+            piece_id = str(input("Select a copy to move\n").strip().upper())
+            
             # Get all pieces on the board for validation
             all_pieces = {}
             for era in [board.past, board.present, board.future]:
                 for piece in era.getPieces():
-                    # Assuming pieces have an ID property that matches what's shown on board
-                    all_pieces[piece.id] = piece
+                    all_pieces[str(piece.id)] = piece
 
-            # Validate piece selection
-            if piece_id not in self._pieces:
+            if piece_id not in all_pieces:
                 print("Not a valid copy\n")
                 continue
 
-            selected_piece = all_pieces[piece_id]
+            # Validate piece selection
+            selected_piece = all_pieces.get(piece_id)
+            if selected_piece is None:
+                print("Not a valid copy\n")
+                continue
 
             # Check if piece belongs to player
             if selected_piece.owner != self._color:
-                print("That is not your copy\n")
+                print("That is not your copy")
                 continue
 
             # Check if piece is in active era
-            if selected_piece.position.era != board.current_era:
-                print("Cannot select a copy from an inactive era\n")
+            if selected_piece.position._era != board.current_era:
+                print("Cannot select a copy from an inactive era")
                 continue
 
             # Check if piece can make any valid moves
             if not board.get_moves_for_piece(selected_piece):
-                print("That copy cannot move\n")
+                print("That copy cannot move")
                 continue
 
             return selected_piece
@@ -239,13 +241,13 @@ class HumanPlayer(PlayerStrategy):
             return valid_moves[0].directions
 
         # First direction
-        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
+        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
         if first_dir is None:
             return None
         directions.append(first_dir)
 
         # Second direction
-        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
+        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
         if second_dir is None:
             return None
         directions.append(second_dir)
@@ -261,14 +263,14 @@ class HumanPlayer(PlayerStrategy):
             direction = input(prompt).strip().lower()
 
             # Check if direction is valid
-            if direction not in self.valid_directions:
+            if direction not in valid_directions:
                 print("Not a valid direction\n")
                 continue
 
             # Check if piece can move in that direction
             temp_move = Move(piece, [direction], None, None)
             if not board.is_valid_direction(temp_move):
-                print(f"Cannot move {self.direction_full[direction]}\n")
+                print(f"Cannot move {direction}\n")
                 continue
 
             return direction
@@ -279,12 +281,13 @@ class HumanPlayer(PlayerStrategy):
         while True:
             era = input("Select the next era to focus on ['past', 'present', 'future']\n").strip().lower()
 
-            if era not in self.valid_eras:
+            if era not in valid_eras:
                 print("Not a valid era")
                 continue
 
             # Check if selected era is current era
-            if era == board.get_era_name(board.current_era):
+            # FIX!!!!
+            if era == board.current_era:
                 print("Cannot select the current era\n")
                 continue
 

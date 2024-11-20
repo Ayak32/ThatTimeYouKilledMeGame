@@ -66,6 +66,44 @@ class Board:
             moves.extend(self.get_moves_for_piece(piece))
         return moves
     
+    # Helper function to calculate new position after a move
+    def get_new_position(self, x, y, direction):
+        if direction == 'n':
+            return (x - 1, y)
+        elif direction == 's':
+            return (x + 1, y)
+        elif direction == 'e':
+            return (x, y + 1)
+        elif direction == 'w':
+            return (x, y - 1)
+        return (x, y)  # For time travel directions
+
+    # Helper function to get era after time travel
+    def get_new_era(self, era, direction):
+        if direction == 'f':
+            if era == self.past:
+                return self.present
+            elif era == self.present:
+                return self.future
+            return None
+        elif direction == 'b':
+            if era == self.future:
+                return self.present
+            elif era == self.present:
+                return self.past
+            return None
+        return era
+
+    # Helper function to check if a position is valid
+    def is_valid_position(self,x, y):
+        return 0 <= x < 4 and 0 <= y < 4
+
+    # Helper function to check if a move would create a paradox
+    def creates_paradox(self, new_x, new_y, new_era, piece):
+        if new_era.grid[new_y][new_x].isOccupied():
+            target_piece = new_era.grid[new_y][new_x].getPiece()
+            return target_piece.owner == piece.owner
+        return False
 
     def get_moves_for_piece(self, piece):
         """Get all valid moves for a specific piece"""
@@ -81,71 +119,33 @@ class Board:
         curr_y = piece.position._y
         curr_era = piece.position._era
 
-        # Helper function to calculate new position after a move
-        def get_new_position(x, y, direction):
-            if direction == 'n':
-                return (x - 1, y)
-            elif direction == 's':
-                return (x + 1, y)
-            elif direction == 'e':
-                return (x, y + 1)
-            elif direction == 'w':
-                return (x, y - 1)
-            return (x, y)  # For time travel directions
-
-        # Helper function to get era after time travel
-        def get_new_era(era, direction):
-            if direction == 'f':
-                if era == self.past:
-                    return self.present
-                elif era == self.present:
-                    return self.future
-                return None
-            elif direction == 'b':
-                if era == self.future:
-                    return self.present
-                elif era == self.present:
-                    return self.past
-                return None
-            return era
-
-        # Helper function to check if a position is valid
-        def is_valid_position(x, y):
-            return 0 <= x < 4 and 0 <= y < 4
-
-        # Helper function to check if a move would create a paradox
-        def creates_paradox(new_x, new_y, new_era):
-            if new_era.grid[new_y][new_x].isOccupied():
-                target_piece = new_era.grid[new_y][new_x].getPiece()
-                return target_piece.owner == piece.owner
-            return False
 
         # First moves (spatial or temporal)
         first_directions = basic_directions + time_directions
         for first_dir in first_directions:
             # Handle spatial movement
             if first_dir in basic_directions:
-                new_x, new_y = get_new_position(curr_x, curr_y, first_dir)
+                new_x, new_y = self.get_new_position(curr_x, curr_y, first_dir)
                 new_era = curr_era
                 
                 # Check if move is valid
-                if not is_valid_position(new_x, new_y):
+                if not self.is_valid_position(new_x, new_y):
                     continue
-                if creates_paradox(new_x, new_y, new_era):
+                if self.creates_paradox(new_x, new_y, new_era, piece):
                     continue
                 
                 # Now check second moves from this new position
                 second_directions = basic_directions + time_directions
                 for second_dir in second_directions:
                     if second_dir in basic_directions:
-                        final_x, final_y = get_new_position(new_x, new_y, second_dir)
+                        final_x, final_y = self.get_new_position(new_x, new_y, second_dir)
                         final_era = new_era
                     else:  # time travel
                         final_x, final_y = new_x, new_y
-                        final_era = get_new_era(new_era, second_dir)
+                        final_era = self.get_new_era(new_era, second_dir)
                     
-                    if (final_era and is_valid_position(final_x, final_y) and 
-                        not creates_paradox(final_x, final_y, final_era)):
+                    if (final_era and self.is_valid_position(final_x, final_y) and 
+                        not self.creates_paradox(final_x, final_y, final_era, piece)):
                         # Check available focus eras (not current era)
                         for next_focus in ['past', 'present', 'future']:
                             if self._getEraByName(next_focus) != self.current_era:
@@ -156,15 +156,15 @@ class Board:
             # Handle time travel as first move
             else:
                 new_x, new_y = curr_x, curr_y
-                new_era = get_new_era(curr_era, first_dir)
-                if not new_era or creates_paradox(new_x, new_y, new_era):
+                new_era = self.get_new_era(curr_era, first_dir)
+                if not new_era or self.creates_paradox(new_x, new_y, new_era, piece):
                     continue
                 
                 # Second moves must be spatial after time travel
                 for second_dir in basic_directions:
-                    final_x, final_y = get_new_position(new_x, new_y, second_dir)
-                    if (is_valid_position(final_x, final_y) and 
-                        not creates_paradox(final_x, final_y, new_era)):
+                    final_x, final_y = self.get_new_position(new_x, new_y, second_dir)
+                    if (self.is_valid_position(final_x, final_y) and 
+                        not self.creates_paradox(final_x, final_y, new_era, piece)):
                         # Check available focus eras
                         for next_focus in ['past', 'present', 'future']:
                             if self._getEraByName(next_focus) != self.current_era:
@@ -183,7 +183,26 @@ class Board:
         }
         return era_map.get(era_name.lower())
 
-
+    def is_valid_direction(self, move: Move) -> bool:
+        """Check if a single direction move is valid"""
+        piece = move.piece
+        direction = move.directions[0]
+        
+        # Get current position
+        current_pos = piece.position
+        
+        # Calculate new position based on direction
+        new_pos = self.get_new_position(current_pos._x, current_pos._y, direction)
+        
+        # Check bounds and collisions
+        if not self.is_valid_position(new_pos[0], new_pos[1]):
+            return False
+            
+        # Check for paradox
+        if self.creates_paradox(new_pos[0], new_pos[1], piece.position._era, piece):
+            return False
+        
+        return True
 
 
     
@@ -198,16 +217,12 @@ class Board:
             return False
         
         # 3. Check if move creates paradox
-        if self._creates_paradox(move):
+        if self.creates_paradox(move):
             return False
         
         # 4. Check if destination is valid
         return self._is_valid_destination(move)
-    
-    def _creates_paradox(self, move: 'Move') -> bool:
-        """Check if a move would create a paradox"""
-        # Implement paradox checking logic
-        pass
+
     
     def _is_valid_destination(self, move: 'Move') -> bool:
         """Check if move destination is valid"""
