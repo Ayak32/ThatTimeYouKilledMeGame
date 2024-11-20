@@ -27,7 +27,7 @@ class Game:
         self.b_player = PlayerFactory.create_player(black_type, "b_player")
         
         # Initialize game components
-        self.board = Board()
+        self.board = Board(self.w_player, self.b_player)
         self.current_player = self.w_player
         self.move_history = MoveHistory()
         
@@ -80,11 +80,8 @@ class Game:
         for space in row:
             if space.isOccupied():
                 piece = space.getPiece()
-                # Use numbers for black pieces, letters for white pieces
-                if piece.owner == "b_player":
-                    symbol = str(1 + space.position._x + space.position._y * 4)
-                else:
-                    symbol = chr(65 + space.position._x + space.position._y * 4)
+                # Use the piece's ID directly instead of calculating it
+                symbol = piece.id
             else:
                 symbol = " "
             row_str += f"{symbol}|"

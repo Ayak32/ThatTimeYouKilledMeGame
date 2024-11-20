@@ -42,31 +42,35 @@ class PlayerFactory:
 class PlayerStrategy(ABC):
     def __init__(self, color) -> None:
         self._color = color
-        if color == "black":
-            self._pieces = [Piece(1, color, None),
-            Piece(2, color, None),
-            Piece(3, color, None)]
+        if color == "b_player":
+            self._pieces = [
+            Piece("1", color, None),
+            Piece("2", color, None),
+            Piece("3", color, None)
+            ]
 
-            self._supply = [Piece(4, color, None),
-            Piece(5, color, None),
-            Piece(6, color, None),
-            Piece(7, color, None)]
+            self._supply = [
+            Piece("4", color, None),
+            Piece("5", color, None),
+            Piece("6", color, None),
+            Piece("7", color, None)]
         else:
-            self._pieces = [Piece('A', color, None),
-            Piece('B', color, None),
-            Piece('C', color, None)]
+            self._pieces = [
+            Piece("A", color, None),
+            Piece("B", color, None),
+            Piece("C", color, None)]
 
-            self._supply = [Piece('D', color, None),
-            Piece('E', color, None),
-            Piece('F', color, None),
-            Piece('G', color, None)]
+            self._supply = [Piece("D", color, None),
+            Piece("E", color, None),
+            Piece("F", color, None),
+            Piece("G", color, None)]
  
 
     def activate_piece(self, piece_id: str):
         """Move a piece from supply to active pieces"""
         if piece_id in self._supply:
             self._supply.remove(piece_id)
-            piece = Piece(piece_id, self.color, None)
+            piece = Piece(piece_id, self._color, None)
             self._pieces.append(piece)
             return piece
         return None
@@ -161,13 +165,9 @@ class RandomAIPlayer(PlayerStrategy):
 
 class HumanPlayer(PlayerStrategy):
     def getMove(self, board: Board, ) -> Move:
-        # piece = self._select_piece(board)
-        # directions = self._select_directions(piece)
-        # next_era = self._select_next_era(board)
-        # return Move(piece, directions, next_era)
 
          # If no pieces can move, skip to era selection
-        if not board.getValidMoves(self.color):
+        if not board.getValidMoves(self):
             print("No copies to move")
             next_era = self._get_next_era(board)
             if next_era is None:
@@ -194,9 +194,9 @@ class HumanPlayer(PlayerStrategy):
 
         return Move(piece, directions, next_era, self._get_opponent_color())
     
-    def input_piece(self, board):
+    def _input_piece(self, board):
         while True:
-            piece_id = input("Select a copy to move").strip().upper()
+            piece_id = input("Select a copy to move\n").strip().upper()
 
             # Get all pieces on the board for validation
             all_pieces = {}
@@ -206,30 +206,30 @@ class HumanPlayer(PlayerStrategy):
                     all_pieces[piece.id] = piece
 
             # Validate piece selection
-            if piece not in self._pieces:
-                print("Not a valid copy")
+            if piece_id not in self._pieces:
+                print("Not a valid copy\n")
                 continue
 
             selected_piece = all_pieces[piece_id]
 
             # Check if piece belongs to player
-            if selected_piece.owner != self.color:
-                print("That is not your copy")
+            if selected_piece.owner != self._color:
+                print("That is not your copy\n")
                 continue
 
             # Check if piece is in active era
             if selected_piece.position.era != board.current_era:
-                print("Cannot select a copy from an inactive era")
+                print("Cannot select a copy from an inactive era\n")
                 continue
 
             # Check if piece can make any valid moves
             if not board.get_moves_for_piece(selected_piece):
-                print("That copy cannot move")
+                print("That copy cannot move\n")
                 continue
 
             return selected_piece
 
-    def _select_directions(self, board: 'Board', piece: 'Piece'):
+    def _input_directions(self, board: 'Board', piece: 'Piece'):
         """Select valid move directions."""
         directions = []
         
@@ -239,13 +239,13 @@ class HumanPlayer(PlayerStrategy):
             return valid_moves[0].directions
 
         # First direction
-        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
         if first_dir is None:
             return None
         directions.append(first_dir)
 
         # Second direction
-        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
         if second_dir is None:
             return None
         directions.append(second_dir)
@@ -262,22 +262,22 @@ class HumanPlayer(PlayerStrategy):
 
             # Check if direction is valid
             if direction not in self.valid_directions:
-                print("Not a valid direction")
+                print("Not a valid direction\n")
                 continue
 
             # Check if piece can move in that direction
             temp_move = Move(piece, [direction], None, None)
             if not board.is_valid_direction(temp_move):
-                print(f"Cannot move {self.direction_full[direction]}")
+                print(f"Cannot move {self.direction_full[direction]}\n")
                 continue
 
             return direction
     
-    def _get_next_era(self, board: 'Board'):
+    def _input_next_era(self, board: 'Board'):
         """Get valid next era selection."""
         valid_eras = {'past', 'present', 'future'}
         while True:
-            era = input("Select the next era to focus on ['past', 'present', 'future']").strip().lower()
+            era = input("Select the next era to focus on ['past', 'present', 'future']\n").strip().lower()
 
             if era not in self.valid_eras:
                 print("Not a valid era")
@@ -285,7 +285,7 @@ class HumanPlayer(PlayerStrategy):
 
             # Check if selected era is current era
             if era == board.get_era_name(board.current_era):
-                print("Cannot select the current era")
+                print("Cannot select the current era\n")
                 continue
 
             return era

@@ -16,11 +16,11 @@ class MoveHistory():
 
 
 class Move:
-    def __init__(self, piece, directions, next_era):
+    def __init__(self, piece, directions, next_era, player):
         self.piece = piece
         self.directions = directions
         self.next_era = next_era
-    
+        self.player = player
     def execute(self, board):
         # Move piece through specified directions
         for direction in self.directions:

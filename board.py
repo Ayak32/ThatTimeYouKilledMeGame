@@ -1,3 +1,4 @@
+from movehistory import Move
 
 class Piece:
     def __init__(self, id, owner, position):
@@ -8,7 +9,10 @@ class Piece:
 
 
 class Board:
-    def __init__(self):
+    def __init__(self, white_player, black_player):
+        self.w_player = white_player
+        self.b_player = black_player
+
         self.past = Era()
         self.present = Era()
         self.future = Era()
@@ -21,15 +25,15 @@ class Board:
     
     def _setupBoard(self):
         """Initialize the board with starting pieces"""
-
-        self.past.grid[0][0].setPiece(self.b_player._pieces[0])  # piece "1"
-        self.present.grid[0][1].setPiece(self.b_player._pieces[1])  # piece "2"
-        self.future.grid[1][0].setPiece(self.b_player._pieces[2])  # piece "3"
+        # Black pieces setup (top left of each era)
+        self.past.grid[0][0].setPiece(self.b_player._pieces[0])    # piece "1"
+        self.present.grid[0][0].setPiece(self.b_player._pieces[1]) # piece "2"
+        self.future.grid[0][0].setPiece(self.b_player._pieces[2])  # piece "3"
         
-        # White pieces (bottom right)
-        self.past.grid[3][3].setPiece(self.w_player._pieces[0])  # piece "A"
-        self.present.grid[3][2].setPiece(self.w_player._pieces[1])  # piece "B"
-        self.future.grid[2][3].setPiece(self.w_player._pieces[2])  # piece "C"
+        # White pieces setup (bottom right of each era)
+        self.past.grid[3][3].setPiece(self.w_player._pieces[0])    # piece "A"
+        self.present.grid[3][3].setPiece(self.w_player._pieces[1]) # piece "B"
+        self.future.grid[3][3].setPiece(self.w_player._pieces[2])  # piece "C"
         
         # Similar setup for present and future if needed
     
@@ -62,11 +66,126 @@ class Board:
             moves.extend(self.get_moves_for_piece(piece))
         return moves
     
+
     def get_moves_for_piece(self, piece):
         """Get all valid moves for a specific piece"""
+        if piece is None or piece.position is None:
+            return []
+
         valid_moves = []
-        # Generate possible moves based on piece position and game rules
+        basic_directions = ['n', 's', 'e', 'w']
+        time_directions = ['f', 'b']
+        
+        # Get current position details
+        curr_x = piece.position._x
+        curr_y = piece.position._y
+        curr_era = piece.position._era
+
+        # Helper function to calculate new position after a move
+        def get_new_position(x, y, direction):
+            if direction == 'n':
+                return (x - 1, y)
+            elif direction == 's':
+                return (x + 1, y)
+            elif direction == 'e':
+                return (x, y + 1)
+            elif direction == 'w':
+                return (x, y - 1)
+            return (x, y)  # For time travel directions
+
+        # Helper function to get era after time travel
+        def get_new_era(era, direction):
+            if direction == 'f':
+                if era == self.past:
+                    return self.present
+                elif era == self.present:
+                    return self.future
+                return None
+            elif direction == 'b':
+                if era == self.future:
+                    return self.present
+                elif era == self.present:
+                    return self.past
+                return None
+            return era
+
+        # Helper function to check if a position is valid
+        def is_valid_position(x, y):
+            return 0 <= x < 4 and 0 <= y < 4
+
+        # Helper function to check if a move would create a paradox
+        def creates_paradox(new_x, new_y, new_era):
+            if new_era.grid[new_y][new_x].isOccupied():
+                target_piece = new_era.grid[new_y][new_x].getPiece()
+                return target_piece.owner == piece.owner
+            return False
+
+        # First moves (spatial or temporal)
+        first_directions = basic_directions + time_directions
+        for first_dir in first_directions:
+            # Handle spatial movement
+            if first_dir in basic_directions:
+                new_x, new_y = get_new_position(curr_x, curr_y, first_dir)
+                new_era = curr_era
+                
+                # Check if move is valid
+                if not is_valid_position(new_x, new_y):
+                    continue
+                if creates_paradox(new_x, new_y, new_era):
+                    continue
+                
+                # Now check second moves from this new position
+                second_directions = basic_directions + time_directions
+                for second_dir in second_directions:
+                    if second_dir in basic_directions:
+                        final_x, final_y = get_new_position(new_x, new_y, second_dir)
+                        final_era = new_era
+                    else:  # time travel
+                        final_x, final_y = new_x, new_y
+                        final_era = get_new_era(new_era, second_dir)
+                    
+                    if (final_era and is_valid_position(final_x, final_y) and 
+                        not creates_paradox(final_x, final_y, final_era)):
+                        # Check available focus eras (not current era)
+                        for next_focus in ['past', 'present', 'future']:
+                            if self._getEraByName(next_focus) != self.current_era:
+                                move = Move(piece, [first_dir, second_dir], next_focus, 
+                                         "b_player" if piece.owner == "w_player" else "w_player")
+                                valid_moves.append(move)
+
+            # Handle time travel as first move
+            else:
+                new_x, new_y = curr_x, curr_y
+                new_era = get_new_era(curr_era, first_dir)
+                if not new_era or creates_paradox(new_x, new_y, new_era):
+                    continue
+                
+                # Second moves must be spatial after time travel
+                for second_dir in basic_directions:
+                    final_x, final_y = get_new_position(new_x, new_y, second_dir)
+                    if (is_valid_position(final_x, final_y) and 
+                        not creates_paradox(final_x, final_y, new_era)):
+                        # Check available focus eras
+                        for next_focus in ['past', 'present', 'future']:
+                            if self._getEraByName(next_focus) != self.current_era:
+                                move = Move(piece, [first_dir, second_dir], next_focus,
+                                         "b_player" if piece.owner == "w_player" else "w_player")
+                                valid_moves.append(move)
+
         return valid_moves
+
+    def _getEraByName(self, era_name: str):
+        """Get era object by name"""
+        era_map = {
+            'past': self.past,
+            'present': self.present,
+            'future': self.future
+        }
+        return era_map.get(era_name.lower())
+
+
+
+
     
     def is_valid_move(self, move: 'Move') -> bool:
         """Check if a move is valid"""
@@ -140,6 +259,7 @@ class Space:
         return self.piece
     
     def setPiece(self, piece):
+        # print("in setPiece. piece: ", piece)
         self.piece = piece
         if piece:
             piece.position = self.position
@@ -187,8 +307,12 @@ class Era:
             for space in row:
                 if space.isOccupied():
                     piece = space.getPiece()
-                    if player is None or piece.owner == player:
+                    # print(f"{piece.id}, {piece.owner}, {piece.position}")
+                    # print(player._color)
+                    if player is None or piece.owner == player._color:
+                        # print("appending piece")
                         pieces.append(piece)
+        # print(pieces)
         return pieces
     
     def movePiece(self, from_position: Position, to_position: Position) -> bool:
