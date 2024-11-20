@@ -1,6 +1,7 @@
 
 class Piece:
-    def __init__(self, owner: str):
+    def __init__(self, id, owner, position):
+        self.id = id
         self.owner = owner
         self.position = None  # Will be set when placed on board
     
@@ -20,14 +21,15 @@ class Board:
     
     def _setupBoard(self):
         """Initialize the board with starting pieces"""
-        # Setup Past Era
-        self.past.grid[0][0].setPiece(Piece("b_player"))  # Black pieces
-        self.past.grid[0][1].setPiece(Piece("b_player"))
-        self.past.grid[1][0].setPiece(Piece("b_player"))
+
+        self.past.grid[0][0].setPiece(self.b_player._pieces[0])  # piece "1"
+        self.present.grid[0][1].setPiece(self.b_player._pieces[1])  # piece "2"
+        self.future.grid[1][0].setPiece(self.b_player._pieces[2])  # piece "3"
         
-        self.past.grid[3][3].setPiece(Piece("w_player"))  # White pieces
-        self.past.grid[3][2].setPiece(Piece("w_player"))
-        self.past.grid[2][3].setPiece(Piece("w_player"))
+        # White pieces (bottom right)
+        self.past.grid[3][3].setPiece(self.w_player._pieces[0])  # piece "A"
+        self.present.grid[3][2].setPiece(self.w_player._pieces[1])  # piece "B"
+        self.future.grid[2][3].setPiece(self.w_player._pieces[2])  # piece "C"
         
         # Similar setup for present and future if needed
     

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from board import Board
 from movehistory import Move
+from board import Position
+from board import Piece
 import random
 
 class PlayerFactory:
@@ -39,10 +41,42 @@ class PlayerFactory:
 
 class PlayerStrategy(ABC):
     def __init__(self, color) -> None:
-        _pieces = [1]
-        _color = color
-        _supply = 4
+        self._color = color
+        if color == "black":
+            self._pieces = [Piece(1, color, None),
+            Piece(2, color, None),
+            Piece(3, color, None)]
 
+            self._supply = [Piece(4, color, None),
+            Piece(5, color, None),
+            Piece(6, color, None),
+            Piece(7, color, None)]
+        else:
+            self._pieces = [Piece('A', color, None),
+            Piece('B', color, None),
+            Piece('C', color, None)]
+
+            self._supply = [Piece('D', color, None),
+            Piece('E', color, None),
+            Piece('F', color, None),
+            Piece('G', color, None)]
+ 
+
+    def activate_piece(self, piece_id: str):
+        """Move a piece from supply to active pieces"""
+        if piece_id in self._supply:
+            self._supply.remove(piece_id)
+            piece = Piece(piece_id, self.color, None)
+            self._pieces.append(piece)
+            return piece
+        return None
+
+    def deactivate_piece(self, piece: Piece):
+        """Move a piece from active to supply"""
+        if piece in self._pieces:
+            self._pieces.remove(piece)
+            self._supply.append(piece.name)
+    
     @abstractmethod
     def getMove(self, board: Board) -> Move:
         pass
@@ -131,4 +165,127 @@ class HumanPlayer(PlayerStrategy):
         # directions = self._select_directions(piece)
         # next_era = self._select_next_era(board)
         # return Move(piece, directions, next_era)
-        pass
+
+         # If no pieces can move, skip to era selection
+        if not board.getValidMoves(self.color):
+            print("No copies to move")
+            next_era = self._get_next_era(board)
+            if next_era is None:
+                return None
+            # Return a special move that only changes era
+            return Move(None, [], next_era, self._get_opponent_color())
+        
+
+        # Select piece
+        piece = self._input_piece(board)
+        if piece is None:
+            return None
+        
+        # Get move directions
+        directions = self._input_directions(board, piece)
+        if directions is None:
+            return None
+
+        
+        # Select next era
+        next_era = self._input_next_era(board)
+        if next_era is None:
+            return None
+
+        return Move(piece, directions, next_era, self._get_opponent_color())
+    
+    def input_piece(self, board):
+        while True:
+            piece_id = input("Select a copy to move").strip().upper()
+
+            # Get all pieces on the board for validation
+            all_pieces = {}
+            for era in [board.past, board.present, board.future]:
+                for piece in era.getPieces():
+                    # Assuming pieces have an ID property that matches what's shown on board
+                    all_pieces[piece.id] = piece
+
+            # Validate piece selection
+            if piece not in self._pieces:
+                print("Not a valid copy")
+                continue
+
+            selected_piece = all_pieces[piece_id]
+
+            # Check if piece belongs to player
+            if selected_piece.owner != self.color:
+                print("That is not your copy")
+                continue
+
+            # Check if piece is in active era
+            if selected_piece.position.era != board.current_era:
+                print("Cannot select a copy from an inactive era")
+                continue
+
+            # Check if piece can make any valid moves
+            if not board.get_moves_for_piece(selected_piece):
+                print("That copy cannot move")
+                continue
+
+            return selected_piece
+
+    def _select_directions(self, board: 'Board', piece: 'Piece'):
+        """Select valid move directions."""
+        directions = []
+        
+        # Handle special case where piece can only make one move
+        valid_moves = board.get_moves_for_piece(piece)
+        if len(valid_moves) == 1 and len(valid_moves[0].directions) == 1:
+            return valid_moves[0].directions
+
+        # First direction
+        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        if first_dir is None:
+            return None
+        directions.append(first_dir)
+
+        # Second direction
+        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        if second_dir is None:
+            return None
+        directions.append(second_dir)
+
+        return directions
+
+    def _get_single_direction(self, board: 'Board', piece: 'Piece', prompt: str):
+        """Get a single valid direction from user."""
+        valid_directions = {'n', 'e', 's', 'w', 'f', 'b'}
+        
+
+        while True:
+            direction = input(prompt).strip().lower()
+
+            # Check if direction is valid
+            if direction not in self.valid_directions:
+                print("Not a valid direction")
+                continue
+
+            # Check if piece can move in that direction
+            temp_move = Move(piece, [direction], None, None)
+            if not board.is_valid_direction(temp_move):
+                print(f"Cannot move {self.direction_full[direction]}")
+                continue
+
+            return direction
+    
+    def _get_next_era(self, board: 'Board'):
+        """Get valid next era selection."""
+        valid_eras = {'past', 'present', 'future'}
+        while True:
+            era = input("Select the next era to focus on ['past', 'present', 'future']").strip().lower()
+
+            if era not in self.valid_eras:
+                print("Not a valid era")
+                continue
+
+            # Check if selected era is current era
+            if era == board.get_era_name(board.current_era):
+                print("Cannot select the current era")
+                continue
+
+            return era

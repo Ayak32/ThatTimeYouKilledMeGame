@@ -22,7 +22,7 @@ class Game:
     
     def __init__(self, white_type="human", black_type="human", undo_redo="off", score="off"):
         """Initialize the game with specified player types and settings."""
-        # Create players using factory
+    
         self.w_player = PlayerFactory.create_player(white_type, "w_player")
         self.b_player = PlayerFactory.create_player(black_type, "b_player")
         
@@ -37,7 +37,7 @@ class Game:
         self.state = GameState.PLAYING
         self.turn_number = 1
         
-    def display_eras(self):
+    def _display_eras(self):
         """Display the current state of all eras."""
         print("---------------------------------")
         
@@ -92,9 +92,12 @@ class Game:
     
     def run(self):
         """Main game loop."""
-        while self.state == GameState.PLAYING:
-            self.display_eras()
-            
+        # while self.state == GameState.PLAYING:
+        while True:
+            self._display_eras()
+            # move = self.self.current_player.getMove()
+            self.play_turn()
+
             if self.undo_redo:
                 choice = self._handle_undo_redo()
                 if choice != "next":
@@ -108,6 +111,7 @@ class Game:
         
         self._handle_game_end()
     
+
     def play_turn(self) -> bool:
         """Execute a single turn of the game."""
         try:
@@ -176,15 +180,15 @@ class Game:
               f"Centrality: {b_scores['centrality']}, "
               f"Focus: {b_scores['focus']}")
     
-    def _calculate_player_scores(self, player) -> Dict[str, int]:
-        """Calculate various scores for a player."""
-        return {
-            'era_presence': self._calculate_era_presence(player),
-            'piece_advantage': self._calculate_piece_advantage(player),
-            'supply': self._calculate_supply(player),
-            'centrality': self._calculate_centrality(player),
-            'focus': self._calculate_focus(player)
-        }
+    # def _calculate_player_scores(self, player) -> Dict[str, int]:
+    #     """Calculate various scores for a player."""
+    #     return {
+    #         'era_presence': self._calculate_era_presence(player),
+    #         'piece_advantage': self._calculate_piece_advantage(player),
+    #         'supply': self._calculate_supply(player),
+    #         'centrality': self._calculate_centrality(player),
+    #         'focus': self._calculate_focus(player)
+    #     }
     
     def _handle_game_end(self):
         """Handle end of game procedures."""
@@ -211,46 +215,46 @@ class Game:
         self.state = GameState.PLAYING
         self.turn_number = 1
 
-    def _calculate_era_presence(self, player) -> int:
-        """Calculate number of eras where player has pieces."""
-        count = 0
-        for era in [self.board.past, self.board.present, self.board.future]:
-            if era.getPieces(player.color):
-                count += 1
-        return count
+    # def _calculate_era_presence(self, player) -> int:
+    #     """Calculate number of eras where player has pieces."""
+    #     count = 0
+    #     for era in [self.board.past, self.board.present, self.board.future]:
+    #         if era.getPieces(player.color):
+    #             count += 1
+    #     return count
 
-    def _calculate_piece_advantage(self, player) -> int:
-        """Calculate piece advantage over opponent."""
-        player_pieces = sum(len(era.getPieces(player.color)) 
-                          for era in [self.board.past, self.board.present, self.board.future])
-        opponent_pieces = sum(len(era.getPieces(self._get_opponent(player).color)) 
-                            for era in [self.board.past, self.board.present, self.board.future])
-        return player_pieces - opponent_pieces
+    # def _calculate_piece_advantage(self, player) -> int:
+    #     """Calculate piece advantage over opponent."""
+    #     player_pieces = sum(len(era.getPieces(player.color)) 
+    #                       for era in [self.board.past, self.board.present, self.board.future])
+    #     opponent_pieces = sum(len(era.getPieces(self._get_opponent(player).color)) 
+    #                         for era in [self.board.past, self.board.present, self.board.future])
+    #     return player_pieces - opponent_pieces
 
-    def _calculate_supply(self, player) -> int:
-        """Calculate remaining supply for player."""
-        total_pieces = sum(len(era.getPieces(player.color)) 
-                         for era in [self.board.past, self.board.present, self.board.future])
-        return 9 - total_pieces  # Assuming 9 total pieces per player
+    # def _calculate_supply(self, player) -> int:
+    #     """Calculate remaining supply for player."""
+    #     total_pieces = sum(len(era.getPieces(player.color)) 
+    #                      for era in [self.board.past, self.board.present, self.board.future])
+    #     return 9 - total_pieces  # Assuming 9 total pieces per player
 
-    def _calculate_centrality(self, player) -> int:
-        """Calculate how many pieces are in central positions."""
-        central_count = 0
-        central_positions = [(1,1), (1,2), (2,1), (2,2)]
-        for era in [self.board.past, self.board.present, self.board.future]:
-            for x, y in central_positions:
-                space = era.getSpace(x, y)
-                if space.isOccupied() and space.getPiece().owner == player.color:
-                    central_count += 1
-        return central_count
+    # def _calculate_centrality(self, player) -> int:
+    #     """Calculate how many pieces are in central positions."""
+    #     central_count = 0
+    #     central_positions = [(1,1), (1,2), (2,1), (2,2)]
+    #     for era in [self.board.past, self.board.present, self.board.future]:
+    #         for x, y in central_positions:
+    #             space = era.getSpace(x, y)
+    #             if space.isOccupied() and space.getPiece().owner == player.color:
+    #                 central_count += 1
+    #     return central_count
 
-    def _calculate_focus(self, player) -> int:
-        """Calculate number of pieces in current focus era."""
-        return len(self.board.current_era.getPieces(player.color))
+    # def _calculate_focus(self, player) -> int:
+    #     """Calculate number of pieces in current focus era."""
+    #     return len(self.board.current_era.getPieces(player.color))
 
-    def _get_opponent(self, player):
-        """Get the opponent of the given player."""
-        return self.b_player if player == self.w_player else self.w_player
+    # def _get_opponent(self, player):
+    #     """Get the opponent of the given player."""
+    #     return self.b_player if player == self.w_player else self.w_player
 
 
 
