@@ -286,15 +286,16 @@ class Board:
     
     def isGameOver(self) -> bool:
         """Check if the game is over"""
-        # Check if either player has pieces in only one era
-        for player in [self.w_player, self.b_player]:
-            eras_with_pieces = 0
-            for era in [self.past, self.present, self.future]:
-                if era.getPieces(player):
-                    eras_with_pieces += 1
-            if eras_with_pieces <= 1:
-                return True
-        return False
+        # Check if current player has pieces in only one era
+        current_player = self.current_player
+        eras_with_pieces = 0
+        
+        for era in [self.past, self.present, self.future]:
+            if len(era.getPieces(current_player)) > 0:
+                eras_with_pieces += 1
+                
+        # Game is over if current player has pieces in only one era
+        return eras_with_pieces <= 1
 
 
     

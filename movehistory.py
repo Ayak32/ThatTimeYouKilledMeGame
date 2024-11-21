@@ -1,17 +1,30 @@
 from position import Position
 class MoveHistory():
     def __init__(self):
-        moves = [] # stack of moves
-        undoneMove = [] # stack of moves
+        self.moves = []  # stack of moves
+        self.undoneMove = []  # stack of moves
     
-    def addMove(move):
-        pass
-
-    def undo():
-        pass
+    def addMove(self, move):
+        """Add a move to the history"""
+        self.moves.append(move)
+        # Clear undone moves when a new move is made
+        self.undoneMove = []
     
-    def redo():
-        pass
+    def undo(self):
+        """Undo the last move"""
+        if self.moves:
+            move = self.moves.pop()
+            self.undoneMove.append(move)
+            return move
+        return None
+    
+    def redo(self):
+        """Redo the last undone move"""
+        if self.undoneMove:
+            move = self.undoneMove.pop()
+            self.moves.append(move)
+            return move
+        return None
 
 
 

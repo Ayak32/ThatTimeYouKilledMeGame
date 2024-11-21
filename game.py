@@ -100,70 +100,42 @@ class Game:
     
     def run(self):
         """Main game loop."""
-        # while self.state == GameState.PLAYING:
         while True:
             self._display_eras()
-            # move = self.self.current_player.getMove()
-            # self.play_turn()
+            
+            # Check for game over at the start of each turn
+            if self.board.isGameOver():
+                winner = "white" if self.current_player == self.b_player else "black"
+                print(f"{winner} has won")
+                
+                # Ask to play again
+                play_again = input("Play again?\n").strip().lower()
+                if play_again == "yes":
+                    # Reset the game
+                    self.__init__(
+                        white_type=self.w_player.__class__.__name__.lower().replace("player", ""),
+                        black_type=self.b_player.__class__.__name__.lower().replace("player", ""),
+                        undo_redo="on" if self.undo_redo else "off",
+                        score="on" if self.score else "off"
+                    )
+                    continue
+                else:
+                    sys.exit(0)
 
             if self.undo_redo:
                 choice = self._handle_undo_redo()
-                if choice != "next":
+                if choice in ['u', 'r']:
                     continue
-            
-            if not self.play_turn():
-                break
-            
-            if self.score:
-                self._display_scores()
-        
-        self._handle_game_end()
-    
 
-    def play_turn(self) -> bool:
-        """Execute a single turn of the game."""
-        try:
-            # Get move from current player
+            # Get and execute move
             move = self.current_player.getMove(self.board)
-            if move is None:
-                return False
-            
-            # Save state before move
-            if self.undo_redo:
-                self.move_history.save_state(self.board, self.turn_number, self.current_player)
-            
-            # Execute move
-            self.board.makeMove(move)
-            print(f"Selected move: {move}")
-
-            # print(f"Selected move: {move.piece.id if move.piece else 'no_move'},{','.join(move.directions)},{move.next_era}")
-            
-            # Update game state
-            self.turn_number += 1
-            # Remove this line since Move.execute() handles player switching
-            # self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
-            
-            # Instead, sync with board's current player
-            self.current_player = self.board.current_player
-            
-            return True
-            
-        except (KeyboardInterrupt, EOFError):
-            return False
+            if move and self.board.makeMove(move):
+                self.move_history.addMove(move)
+                # Switch players and increment turn
+                self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                self.board.current_player = self.current_player
+                self.turn_number += 1
     
-        # def _get_era_name(self, era: 'Era'):
-        # """Convert Era object to its string name representation"""
-        # if era == era.board.past:
-        #     return "past"
-        # elif era == era.board.present:
-        #     return "present"
-        # elif era == era.board.future:
-        #     return "future"
-        # return "unknown"
-
-    def __str__(self):
-        return f"{self.piece.id},{','.join(self.directions)},{self._get_era_name(self.next_era)}"
-
     def _handle_undo_redo(self) -> str:
         """Handle undo/redo functionality."""
         while True:
@@ -277,6 +249,25 @@ class Game:
     # def _get_opponent(self, player):
     #     """Get the opponent of the given player."""
     #     return self.b_player if player == self.w_player else self.w_player
+
+    def get_winner(self) -> GameState:
+        """Determine the winner of the game"""
+        w_pieces = 0
+        b_pieces = 0
+        
+        # Count pieces for each player across all eras
+        for era in [self.board.past, self.board.present, self.board.future]:
+            w_pieces += len(era.getPieces(self.w_player))
+            b_pieces += len(era.getPieces(self.b_player))
+        
+        # If white has no pieces, black wins
+        if w_pieces == 0:
+            return GameState.BLACK_WON
+        # If black has no pieces, white wins
+        elif b_pieces == 0:
+            return GameState.WHITE_WON
+        # If both have pieces, game continues
+        return GameState.PLAYING
 
 
 
