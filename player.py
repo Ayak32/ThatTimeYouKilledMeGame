@@ -267,18 +267,18 @@ class HumanPlayer(PlayerStrategy):
         while True:
             direction = input(prompt).strip().lower()
 
-            # Check if direction is valid
             if direction not in valid_directions:
                 print("Not a valid direction")
                 continue
 
-            # Check if trying to move backward with empty supply
             if direction == 'b' and not board.current_player._supply:
                 print("Cannot move backward - no pieces in supply")
                 continue
 
-            # Check if piece can move in that direction
+            # Create a temporary move with just this direction
             temp_move = Move(piece, [direction], None, None)
+            
+            # Check if the direction is valid
             if not board.is_valid_direction(temp_move):
                 print(f"Cannot move {direction}")
                 continue

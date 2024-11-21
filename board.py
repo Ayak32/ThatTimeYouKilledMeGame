@@ -104,10 +104,13 @@ class Board:
         return 0 <= x < 4 and 0 <= y < 4
 
     # Helper function to check if a move would create a paradox
-    def creates_paradox(self, new_x, new_y, new_era, piece):
-        if new_era.grid[new_y][new_x].isOccupied():
-            target_piece = new_era.grid[new_y][new_x].getPiece()
-            return target_piece.owner == piece.owner
+    def creates_paradox(self, x, y, era, piece):
+        """Check if placing piece at (x,y) in era would create a paradox"""
+        space = era.grid[y][x]
+        if space.isOccupied():
+            occupied_piece = space.getPiece()
+            # Only a paradox if the piece belongs to the same player
+            return occupied_piece.owner == piece.owner
         return False
 
     def get_moves_for_piece(self, piece):
@@ -203,28 +206,50 @@ class Board:
             
         current_pos = move.piece.position
         
-        for direction in move.directions:
+        # For single direction validation (from _get_single_direction)
+        if len(move.directions) == 1:
+            direction = move.directions[0]
+            
             # Check if trying to move backward with empty supply
             if direction == 'b' and not self.current_player._supply:
                 return False
                 
             # Get new position after move
             result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
-            if result is None:
+            if result is None or not self.is_valid_position(result[0], result[1]):
                 return False
                 
-            new_x, new_y, new_era = result
+            # For spatial moves, check current era
+            if direction not in ['f', 'b']:
+                space = current_pos._era.grid[result[1]][result[0]]
+                if space.isOccupied() and space.getPiece().owner == move.piece.owner:
+                    return False
             
-            # Check if position is within bounds
-            if not self.is_valid_position(new_x, new_y):
+            return True
+            
+        # For full two-direction move validation
+        first_dir, second_dir = move.directions
+        
+        # Get position after first move
+        result1 = self.get_new_position(current_pos._x, current_pos._y, first_dir, current_pos._era)
+        if result1 is None or not self.is_valid_position(result1[0], result1[1]):
+            return False
+            
+        # Check first move in current era
+        if first_dir not in ['f', 'b']:
+            space1 = current_pos._era.grid[result1[1]][result1[0]]
+            if space1.isOccupied() and space1.getPiece().owner == move.piece.owner:
                 return False
-                
-            # Check for paradoxes
-            if self.creates_paradox(new_x, new_y, new_era, move.piece):
-                return False
-                
-            # Update position for next direction
-            current_pos = Position(new_x, new_y, new_era)
+        
+        # Get position after second move
+        result2 = self.get_new_position(result1[0], result1[1], second_dir, result1[2])
+        if result2 is None or not self.is_valid_position(result2[0], result2[1]):
+            return False
+            
+        # Check final position in destination era
+        final_space = result2[2].grid[result2[1]][result2[0]]
+        if final_space.isOccupied() and final_space.getPiece().owner == move.piece.owner:
+            return False
             
         return True
 
