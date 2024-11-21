@@ -23,11 +23,15 @@ class Game:
     def __init__(self, white_type="human", black_type="human", undo_redo="off", score="off"):
         """Initialize the game with specified player types and settings."""
     
-        self.w_player = PlayerFactory.create_player(white_type, "w_player")
-        self.b_player = PlayerFactory.create_player(black_type, "b_player")
+        self.board = Board()
+        self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
+        self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
         
+        self.board.w_player = self.w_player
+        self.board.b_player = self.b_player
+        self.board._setupBoard()
         # Initialize game components
-        self.board = Board(self.w_player, self.b_player)
+        
         self.current_player = self.w_player
         self.move_history = MoveHistory()
         
@@ -42,19 +46,25 @@ class Game:
         print("---------------------------------")
         
         # Display black's focus indicator
-        if self.current_player == self.b_player:
+        if self.b_player.current_era == self.board.future:
             print(" " * 26 + "black")
+        elif self.b_player.current_era == self.board.present:
+            print(" " * 7 + "black")
         else:
-            print()
-            
+            print(" " * 2 + "black")
+        
         # Display all three eras side by side
         self._display_era_rows(self.board.past, self.board.present, self.board.future)
         
+
         # Display white's focus indicator
-        if self.current_player == self.w_player:
-            print(" " * 2 + "white")
+        if self.w_player.current_era == self.board.future:
+            print(" " * 26 + "white")
+        elif self.w_player.current_era == self.board.present:
+            print(" " * 7 + "white")
         else:
-            print()
+            print(" " * 2 + "white")
+        
             
         # Display turn information
         print(f"Turn: {self.turn_number}, Current player: {'white' if self.current_player == self.w_player else 'black'}")
@@ -93,7 +103,7 @@ class Game:
         while True:
             self._display_eras()
             # move = self.self.current_player.getMove()
-            self.play_turn()
+            # self.play_turn()
 
             if self.undo_redo:
                 choice = self._handle_undo_redo()
@@ -123,7 +133,7 @@ class Game:
             
             # Execute move
             self.board.makeMove(move)
-            print(f"Selected move: {move}")  # Displays move in required format
+            print(f"Selected move: {move.piece.id},{move.directions[0]},{move.directions[1]},{move.next_era}")  # Displays move in required format
             
             # Update game state
             self.turn_number += 1

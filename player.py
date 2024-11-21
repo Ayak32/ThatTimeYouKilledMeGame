@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from board import Board
 from movehistory import Move
-from board import Position
+from position import Position
 from board import Piece
 import random
 
@@ -11,7 +11,7 @@ class PlayerFactory:
     Supports different player types for each color
     """
     @staticmethod
-    def create_player(player_type, color):
+    def create_player(player_type, color, board):
         """
         Create a player strategy based on type and color
         
@@ -32,7 +32,7 @@ class PlayerFactory:
         player_class = player_map.get(player_type, HumanPlayer)
         
         # Create and return player instance
-        return player_class(color)
+        return player_class(color, board)
     
 
 
@@ -40,9 +40,11 @@ class PlayerFactory:
 """ Strategy Pattern """
 
 class PlayerStrategy(ABC):
-    def __init__(self, color) -> None:
+    def __init__(self, color, board) -> None:
         self._color = color
+        
         if color == "b_player":
+            self.current_era = board.future
             self._pieces = [
             Piece("1", color, None),
             Piece("2", color, None),
@@ -55,6 +57,7 @@ class PlayerStrategy(ABC):
             Piece("6", color, None),
             Piece("7", color, None)]
         else:
+            self.current_era = board.past
             self._pieces = [
             Piece("A", color, None),
             Piece("B", color, None),
@@ -192,8 +195,13 @@ class HumanPlayer(PlayerStrategy):
         if next_era is None:
             return None
 
-        return Move(piece, directions, next_era, self._get_opponent_color())
+        return Move(piece, directions, next_era, self)
     
+
+    def _get_opponent_color(self):
+        """Get the opponent of the given player."""
+        return "b_player" if self._color == "w_player" else "w_player"
+
     def _input_piece(self, board):
         while True:
             piece_id = str(input("Select a copy to move\n").strip().upper())
@@ -220,7 +228,7 @@ class HumanPlayer(PlayerStrategy):
                 continue
 
             # Check if piece is in active era
-            if selected_piece.position._era != board.current_era:
+            if selected_piece.position._era != self.current_era:
                 print("Cannot select a copy from an inactive era")
                 continue
 
@@ -241,13 +249,13 @@ class HumanPlayer(PlayerStrategy):
             return valid_moves[0].directions
 
         # First direction
-        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        first_dir = self._get_single_direction(board, piece, "Select the first direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
         if first_dir is None:
             return None
         directions.append(first_dir)
 
         # Second direction
-        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'")
+        second_dir = self._get_single_direction(board, piece, "Select the second direction to move: 'n', 'e', 's', 'w', 'f', 'b'\n")
         if second_dir is None:
             return None
         directions.append(second_dir)
@@ -270,7 +278,7 @@ class HumanPlayer(PlayerStrategy):
             # Check if piece can move in that direction
             temp_move = Move(piece, [direction], None, None)
             if not board.is_valid_direction(temp_move):
-                print(f"Cannot move {direction}\n")
+                print(f"Cannot move {direction}")
                 continue
 
             return direction
@@ -287,8 +295,8 @@ class HumanPlayer(PlayerStrategy):
 
             # Check if selected era is current era
             # FIX!!!!
-            if era == board.current_era:
-                print("Cannot select the current era\n")
+            if board._getEraByName(era) == self.current_era:
+                print("Cannot select the current era")
                 continue
 
             return era
