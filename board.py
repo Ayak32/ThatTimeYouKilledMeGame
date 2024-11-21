@@ -12,13 +12,14 @@ class Board:
     def __init__(self):
         self.w_player = None
         self.b_player = None
+        self.current_player = None
 
         self.past = Era()
         self.present = Era()
         self.future = Era()
         
         # Current focus starts on past era for white player
-        self.current_player = self.w_player
+        
         # self.current_era = self.past
         
         # self._setupBoard()
@@ -52,11 +53,11 @@ class Board:
         pass
     
     def getValidMoves(self, player):
-        """Get all valid moves for a player"""
-        moves = []
-        for piece in self.current_player.current_era.getPieces(player):
-            moves.extend(self.get_moves_for_piece(piece))
-        return moves
+        """Get all valid moves for the current player"""
+        valid_moves = []
+        for piece in player.current_era.getPieces(player):
+            valid_moves.extend(self.get_moves_for_piece(piece))
+        return valid_moves
     
     # Helper function to calculate new position after a move
     def get_new_position(self, x, y, direction):
@@ -153,7 +154,7 @@ class Board:
                         not self.creates_paradox(final_x, final_y, final_era, piece)):
                         # Check available focus eras (not current era)
                         for next_focus in ['past', 'present', 'future']:
-                            if self._getEraByName(next_focus) != self.current_player.current_era:
+                            if next_focus != self.current_player.current_era:
                                 move = Move(piece, [first_dir, second_dir], next_focus, 
                                          "b_player" if piece.owner == "w_player" else "w_player")
                                 valid_moves.append(move)
@@ -172,7 +173,7 @@ class Board:
                         not self.creates_paradox(final_x, final_y, new_era, piece)):
                         # Check available focus eras
                         for next_focus in ['past', 'present', 'future']:
-                            if self._getEraByName(next_focus) != self.current_player.current_era:
+                            if next_focus != self.current_player.current_era:
                                 move = Move(piece, [first_dir, second_dir], next_focus,
                                          "b_player" if piece.owner == "w_player" else "w_player")
                                 valid_moves.append(move)

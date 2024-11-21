@@ -55,9 +55,8 @@ class Move:
         """
         # Handle special case of era-change-only move
         if self.piece is None:
-            board.current_player.current_era = board._getEraByName(self.next_era)
-            board.current_player = self.next_player
-
+            board.current_player.current_era = self.next_era
+            board.current_player = board.b_player if self.next_player == "b_player" else board.w_player
             return True
 
         current_pos = self.piece.position
@@ -86,8 +85,8 @@ class Move:
             current_era = current_pos._era
 
         # Update board focus for next turn
-        board.current_player.current_era = board._getEraByName(self.next_era)
-        board.current_player = self.next_player
+        board.current_player.current_era = self.next_era
+        board.current_player = board.b_player if board.current_player == board.w_player else board.w_player
         
         return True
 

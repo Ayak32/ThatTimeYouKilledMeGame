@@ -195,7 +195,7 @@ class HumanPlayer(PlayerStrategy):
         if next_era is None:
             return None
 
-        return Move(piece, directions, next_era, self)
+        return Move(piece, directions, next_era, self._get_opponent_color())
     
 
     def _get_opponent_color(self):
@@ -293,10 +293,12 @@ class HumanPlayer(PlayerStrategy):
                 print("Not a valid era")
                 continue
 
+            # Get the actual Era object instead of using the string
+            next_era = getattr(board, era)  # This gets board.past, board.present, or board.future
+            
             # Check if selected era is current era
-            # FIX!!!!
-            if board._getEraByName(era) == self.current_era:
+            if next_era == self.current_era:
                 print("Cannot select the current era")
                 continue
 
-            return era
+            return next_era  # Return the Era object instead of the string

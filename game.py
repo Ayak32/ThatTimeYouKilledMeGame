@@ -29,6 +29,7 @@ class Game:
         
         self.board.w_player = self.w_player
         self.board.b_player = self.b_player
+        self.board.current_player = self.w_player
         self.board._setupBoard()
         # Initialize game components
         
@@ -49,7 +50,7 @@ class Game:
         if self.b_player.current_era == self.board.future:
             print(" " * 26 + "black")
         elif self.b_player.current_era == self.board.present:
-            print(" " * 7 + "black")
+            print(" " * 14 + "black")
         else:
             print(" " * 2 + "black")
         
@@ -61,7 +62,7 @@ class Game:
         if self.w_player.current_era == self.board.future:
             print(" " * 26 + "white")
         elif self.w_player.current_era == self.board.present:
-            print(" " * 7 + "white")
+            print(" " * 14 + "white")
         else:
             print(" " * 2 + "white")
         
@@ -133,16 +134,15 @@ class Game:
             
             # Execute move
             self.board.makeMove(move)
-            print(f"Selected move: {move.piece.id},{move.directions[0]},{move.directions[1]},{move.next_era}")  # Displays move in required format
+            print(f"Selected move: {move}")
             
             # Update game state
             self.turn_number += 1
-            self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+            # Remove this line since Move.execute() handles player switching
+            # self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
             
-            # Check for game end
-            if self.board.isGameOver():
-                self.state = (GameState.WHITE_WON if self.current_player == self.b_player 
-                            else GameState.BLACK_WON)
+            # Instead, sync with board's current player
+            self.current_player = self.board.current_player
             
             return True
             
