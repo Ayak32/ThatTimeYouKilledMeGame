@@ -211,13 +211,13 @@ class HumanPlayer(PlayerStrategy):
                     all_pieces[str(piece.id)] = piece
 
             if piece_id not in all_pieces:
-                print("Not a valid copy\n")
+                print("Not a valid copy")
                 continue
 
             # Validate piece selection
             selected_piece = all_pieces.get(piece_id)
             if selected_piece is None:
-                print("Not a valid copy\n")
+                print("Not a valid copy")
                 continue
 
             # Check if piece belongs to player
@@ -270,7 +270,7 @@ class HumanPlayer(PlayerStrategy):
 
             # Check if direction is valid
             if direction not in valid_directions:
-                print("Not a valid direction\n")
+                print("Not a valid direction")
                 continue
 
             # Check if piece can move in that direction
