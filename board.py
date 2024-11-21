@@ -196,35 +196,36 @@ class Board:
         }
         return era_map.get(era_name.lower())
 
-    def is_valid_direction(self, move, direction=None):
-        """Validate if a move direction is legal"""
-        # If direction is not provided, use the first direction from the move
-        if direction is None:
-            if not move.directions:
-                return False
-            direction = move.directions[0]
+    def is_valid_direction(self, move: 'Move') -> bool:
+        """Check if a move's direction is valid"""
+        if not move.piece or not move.directions:
+            return False
             
         current_pos = move.piece.position
         
-        # Get new position after move
-        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
-        if result is None:
-            return False
+        for direction in move.directions:
+            # Check if trying to move backward with empty supply
+            if direction == 'b' and not self.current_player._supply:
+                return False
+                
+            # Get new position after move
+            result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+            if result is None:
+                return False
+                
+            new_x, new_y, new_era = result
             
-        new_x, new_y, new_era = result
-        
-        # Check if new position is within bounds
-        if not self.is_valid_position(new_x, new_y):
-            return False
+            # Check if position is within bounds
+            if not self.is_valid_position(new_x, new_y):
+                return False
+                
+            # Check for paradoxes
+            if self.creates_paradox(new_x, new_y, new_era, move.piece):
+                return False
+                
+            # Update position for next direction
+            current_pos = Position(new_x, new_y, new_era)
             
-        # For temporal moves, check if destination space is empty or contains capturable piece
-        if direction in ['f', 'b']:
-            destination_space = new_era.grid[new_y][new_x]
-            if destination_space.isOccupied():
-                piece = destination_space.getPiece()
-                if piece.owner == move.piece.owner:
-                    return False
-        
         return True
 
     def is_valid_move(self, move):
