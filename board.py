@@ -14,9 +14,9 @@ class Board:
         self.b_player = None
         self.current_player = None
 
-        self.past = Era()
-        self.present = Era()
-        self.future = Era()
+        self.past = Era("past")
+        self.present = Era("present")
+        self.future = Era("future")
         
         # Current focus starts on past era for white player
         
@@ -60,44 +60,43 @@ class Board:
         return valid_moves
     
     # Helper function to calculate new position after a move
-    def get_new_position(self, x, y, direction):
+    def get_new_position(self, x, y, direction, era=None):
         new_x = x
         new_y = y
+        new_era = era
         
-        if direction == 'n': # North: decrease y (move up)
+        if direction == 'n':  # North: decrease y (move up)
             new_y -= 1
-        elif direction == 's':    # South: increase y (move down)
+        elif direction == 's':  # South: increase y (move down)
             new_y += 1
-        elif direction == 'e':    # East: increase x (move right)
+        elif direction == 'e':  # East: increase x (move right)
             new_x += 1
-        elif direction == 'w':    # West: decrease x (move left)
+        elif direction == 'w':  # West: decrease x (move left)
             new_x -= 1
+        elif direction in ['f', 'b']:
+            new_era = self.get_new_era(era, direction)
+            if new_era is None:  # Invalid temporal movement
+                return None
         
-        # For temporal moves, position stays the same
-        if direction in ['f', 'b']:
-            return (x, y)
-        
-        # Check if new position is within board boundaries (4x4 grid)
-        # if 0 <= new_x < 4 and 0 <= new_y < 4:
-        return (new_x, new_y)
-        
-        # Return None if position would be out of bounds
-        # return None
+        return (new_x, new_y, new_era)
 
     # Helper function to get era after time travel
     def get_new_era(self, era, direction):
+        """Get new era after temporal movement, respecting temporal movement rules"""
         if direction == 'f':
-            if era == self.past:
-                return self.present
+            if era == self.future:  # Can't move forward from future
+                return None
             elif era == self.present:
                 return self.future
-            return None
-        elif direction == 'b':
-            if era == self.future:
+            elif era == self.past:
                 return self.present
+        elif direction == 'b':
+            if era == self.past:  # Can't move backward from past
+                return None
             elif era == self.present:
                 return self.past
-            return None
+            elif era == self.future:
+                return self.present
         return era
 
     # Helper function to check if a position is valid
@@ -131,8 +130,10 @@ class Board:
         for first_dir in first_directions:
             # Handle spatial movement
             if first_dir in basic_directions:
-                new_x, new_y = self.get_new_position(curr_x, curr_y, first_dir)
-                new_era = curr_era
+                result = self.get_new_position(curr_x, curr_y, first_dir, curr_era)
+                if result is None:
+                    continue
+                new_x, new_y, new_era = result
                 
                 # Check if move is valid
                 if not self.is_valid_position(new_x, new_y):
@@ -144,8 +145,10 @@ class Board:
                 second_directions = basic_directions + time_directions
                 for second_dir in second_directions:
                     if second_dir in basic_directions:
-                        final_x, final_y = self.get_new_position(new_x, new_y, second_dir)
-                        final_era = new_era
+                        result = self.get_new_position(new_x, new_y, second_dir, new_era)
+                        if result is None:
+                            continue
+                        final_x, final_y, final_era = result
                     else:  # time travel
                         final_x, final_y = new_x, new_y
                         final_era = self.get_new_era(new_era, second_dir)
@@ -168,7 +171,11 @@ class Board:
                 
                 # Second moves must be spatial after time travel
                 for second_dir in basic_directions:
-                    final_x, final_y = self.get_new_position(new_x, new_y, second_dir)
+                    result = self.get_new_position(new_x, new_y, second_dir, new_era)
+                    if result is None:
+                        continue
+                    final_x, final_y, final_era = result
+                    
                     if (self.is_valid_position(final_x, final_y) and 
                         not self.creates_paradox(final_x, final_y, new_era, piece)):
                         # Check available focus eras
@@ -189,64 +196,61 @@ class Board:
         }
         return era_map.get(era_name.lower())
 
-    def is_valid_direction(self, move: Move) -> bool:
-        """Check if a single direction move is valid"""
-        piece = move.piece
-        direction = move.directions[0]
+    def is_valid_direction(self, move, direction=None):
+        """Validate if a move direction is legal"""
+        # If direction is not provided, use the first direction from the move
+        if direction is None:
+            if not move.directions:
+                return False
+            direction = move.directions[0]
+            
+        current_pos = move.piece.position
         
-        # Get current position
-        current_pos = piece.position
-        
-        # Calculate new position based on direction
-        new_pos = self.get_new_position(current_pos._x, current_pos._y, direction)
-        
-        # Check bounds and collisions
-        if not self.is_valid_position(new_pos[0], new_pos[1]):
+        # Get new position after move
+        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        if result is None:
             return False
             
-        # Check for paradox
-        if self.creates_paradox(new_pos[0], new_pos[1], piece.position._era, piece):
+        new_x, new_y, new_era = result
+        
+        # Check if new position is within bounds
+        if not self.is_valid_position(new_x, new_y):
             return False
+            
+        # For temporal moves, check if destination space is empty or contains capturable piece
+        if direction in ['f', 'b']:
+            destination_space = new_era.grid[new_y][new_x]
+            if destination_space.isOccupied():
+                piece = destination_space.getPiece()
+                if piece.owner == move.piece.owner:
+                    return False
         
         return True
 
-
-    
-    def is_valid_move(self, move) -> bool:
-        """Check if a move is valid"""
-        # 1. Piece belongs to current player
-        # print(f"move.piece.owner: {move.piece.owner}, self.current_player: {self.current_player}")
+    def is_valid_move(self, move):
+        """Validate if a move is legal"""
+        # Handle era-change-only moves
+        if move.piece is None:
+            return True
+            
+        # For moves with pieces, validate ownership and other rules
         if move.piece.owner != self.current_player._color:
             return False
- 
-        # 2. Piece is in current focus era
-        if move.piece.position._era != self.current_player.current_era:
-            return False
- 
-        # Check first move
-        curr_x, curr_y = move.piece.position._x, move.piece.position._y
-        curr_era = move.piece.position._era
-        
-        new_x, new_y = self.get_new_position(curr_x, curr_y, move.directions[0])
-        new_era = curr_era if move.directions[0] in ['n', 's', 'e', 'w'] else self.get_new_era(curr_era, move.directions[0])
-        
-        if not new_era or not self.is_valid_position(new_x, new_y):
-            return False
-  
-        if self.creates_paradox(new_x, new_y, new_era, move.piece):
-            return False
             
-        # Check second move
-        final_x, final_y = self.get_new_position(new_x, new_y, move.directions[1])
-        final_era = new_era if move.directions[1] in ['n', 's', 'e', 'w'] else self.get_new_era(new_era, move.directions[1])
-        
-        if not final_era or not self.is_valid_position(final_x, final_y):
-            return False
-        if self.creates_paradox(final_x, final_y, final_era, move.piece):
-            return False
-
-        # 4. Check if destination is valid
-        return self._is_valid_destination(move)
+        # Validate each direction in the move
+        current_pos = move.piece.position
+        for direction in move.directions:
+            if not self.is_valid_direction(move):
+                return False
+            result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+            if result is None:
+                return False
+            new_x, new_y, new_era = result
+            if not self.is_valid_position(new_x, new_y):
+                return False
+            current_pos = Position(new_x, new_y, new_era)
+            
+        return True
 
     # TODO: Implement destination validation logic
     def _is_valid_destination(self, move: 'Move') -> bool:
@@ -298,7 +302,8 @@ class Space:
         return piece
 
 class Era:
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.grid = [[Space(x, y, self) for x in range(4)]
                     for y in range(4)]
         self._setupAdjacency()
@@ -351,11 +356,19 @@ class Era:
         if not from_space.isOccupied():
             return False
         
-        piece = from_space.clearPiece()
+        moving_piece = from_space.clearPiece()
+        
         # Handle capture if destination is occupied
         if to_space.isOccupied():
-            captured_piece = to_space.clearPiece()
-            # You might want to handle the captured piece here
+            captured_piece = to_space.getPiece()
+            # Only allow capture of opponent's pieces
+            if captured_piece.owner == moving_piece.owner:
+                # Put the piece back if trying to capture own piece
+                from_space.setPiece(moving_piece)
+                return False
+            # Clear the captured piece
+            to_space.clearPiece()
         
-        to_space.setPiece(piece)
+        # Move the piece to its new position
+        to_space.setPiece(moving_piece)
         return True

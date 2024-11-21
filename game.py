@@ -135,6 +135,8 @@ class Game:
             # Execute move
             self.board.makeMove(move)
             print(f"Selected move: {move}")
+
+            # print(f"Selected move: {move.piece.id if move.piece else 'no_move'},{','.join(move.directions)},{move.next_era}")
             
             # Update game state
             self.turn_number += 1
@@ -149,6 +151,19 @@ class Game:
         except (KeyboardInterrupt, EOFError):
             return False
     
+        # def _get_era_name(self, era: 'Era'):
+        # """Convert Era object to its string name representation"""
+        # if era == era.board.past:
+        #     return "past"
+        # elif era == era.board.present:
+        #     return "present"
+        # elif era == era.board.future:
+        #     return "future"
+        # return "unknown"
+
+    def __str__(self):
+        return f"{self.piece.id},{','.join(self.directions)},{self._get_era_name(self.next_era)}"
+
     def _handle_undo_redo(self) -> str:
         """Handle undo/redo functionality."""
         while True:

@@ -68,21 +68,30 @@ class Move:
             if new_pos is None:
                 return False
                 
-            # If it's a temporal move, get the new era
+            # Move the piece
             if direction in ['f', 'b']:
-                new_era = self._get_new_era(current_era, direction, board)
-                if new_era is None:
-                    return False
-                success = new_era.movePiece(current_pos, new_pos)
+                # Clear piece from current position in old era
+                current_era.grid[current_pos._y][current_pos._x].clearPiece()
+                
+                # If moving backward in time and player has supply, spawn a new piece
+                if direction == 'b' and board.current_player._supply:
+                    # Get the first piece from supply
+                    supply_piece = board.current_player._supply[0]
+                    activated_piece = board.current_player.activate_piece(supply_piece.id)
+                    if activated_piece:
+                        # Place the new piece in the original position
+                        current_era.grid[current_pos._y][current_pos._x].setPiece(activated_piece)
+                
+                # Set piece in new position in new era
+                new_pos._era.grid[new_pos._y][new_pos._x].setPiece(self.piece)
             else:
                 success = current_era.movePiece(current_pos, new_pos)
+                if not success:
+                    return False
             
-            if not success:
-                return False
-                
             # Update for next direction
             current_pos = new_pos
-            current_era = current_pos._era
+            current_era = new_pos._era
 
         # Update board focus for next turn
         board.current_player.current_era = self.next_era
@@ -92,25 +101,11 @@ class Move:
 
     def _get_new_position(self, current_pos: 'Position', direction: str, board: 'Board'):
         """Calculate new position after a move in given direction"""
-        new_x, new_y = current_pos._x, current_pos._y
-        
-        if direction == 'n':
-            new_y -= 1
-        elif direction == 's':
-            new_y += 1
-        elif direction == 'e':
-            new_x += 1
-        elif direction == 'w':
-            new_x -= 1
-            
-        # For temporal moves, position stays the same
-        if direction in ['f', 'b']:
-            return Position(current_pos._x, current_pos._y, current_pos._era)
-            
-        # Check bounds
-        if 0 <= new_x < 4 and 0 <= new_y < 4:
-            return Position(new_x, new_y, current_pos._era)
-        return None
+        result = board.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        if result is None:
+            return None
+        new_x, new_y, new_era = result
+        return Position(new_x, new_y, new_era)
 
     def _get_new_era(self, current_era: 'Era', direction: str, board: 'Board'):
         """Get new era for temporal movement"""
@@ -126,13 +121,33 @@ class Move:
                 return board.past
         return None
 
-    def __str__(self) -> str:
-        """String representation for move output"""
+    # def _get_era_name(self, era: 'Era') -> str:
+    #     """Convert Era object to its string name representation"""
+    #     if era == era.board.past:
+    #         return "past"
+    #     elif era == era.board.present:
+    #         return "present"
+    #     elif era == era.board.future:
+    #         retubrn "future"
+    #     return "unknown"
+
+    def __str__(self):
+        """String representation of the move"""
         if self.piece is None:
-            return f"no_move,{self.next_era}"
-        return f"{self.piece.id},{','.join(self.directions)},{self.next_era}"
+            # Era-change-only move
+            return f"Change focus to {self.next_era.name}"
+        else:
+            # Normal move with piece
+            return f"{self.piece.id},{','.join(self.directions)},{self.next_era.name}"
 
-
+    # def _getNameByEra(self, era_name: str):
+    #     """Get era object by name"""
+    #     era_map = {
+    #         'past': self.past,
+    #         'present': self.present,
+    #         'future': self.future
+    #     }
+    #     return era_map.get(era_name.lower())
 
 
 

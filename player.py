@@ -71,11 +71,12 @@ class PlayerStrategy(ABC):
 
     def activate_piece(self, piece_id: str):
         """Move a piece from supply to active pieces"""
-        if piece_id in self._supply:
-            self._supply.remove(piece_id)
-            piece = Piece(piece_id, self._color, None)
-            self._pieces.append(piece)
-            return piece
+        # Find the piece in supply with matching ID
+        for piece in self._supply:
+            if piece.id == piece_id:
+                self._supply.remove(piece)
+                self._pieces.append(piece)
+                return piece
         return None
 
     def deactivate_piece(self, piece: Piece):
@@ -167,30 +168,27 @@ class RandomAIPlayer(PlayerStrategy):
         return random.choice(possible_moves) if possible_moves else None
 
 class HumanPlayer(PlayerStrategy):
-    def getMove(self, board):
-
-         # If no pieces can move, skip to era selection
-        if not board.getValidMoves(self):
+    def getMove(self, board: 'Board') -> Move:
+        """Get move from human player"""
+        # Check if there are any pieces in the current era
+        pieces_in_era = self.current_era.getPieces(self)
+        if not pieces_in_era:
             print("No copies to move")
-            next_era = self._get_next_era(board)
+            # If no pieces in current era, only allow era change
+            next_era = self._input_next_era(board)
             if next_era is None:
                 return None
-            # Return a special move that only changes era
             return Move(None, [], next_era, self._get_opponent_color())
-        
-
-        # Select piece
+            
+        # Normal move with piece selection
         piece = self._input_piece(board)
         if piece is None:
             return None
-        
-        # Get move directions
+            
         directions = self._input_directions(board, piece)
         if directions is None:
             return None
-
-        
-        # Select next era
+            
         next_era = self._input_next_era(board)
         if next_era is None:
             return None
