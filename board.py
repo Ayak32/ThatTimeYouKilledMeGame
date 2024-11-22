@@ -118,25 +118,56 @@ class Board:
             return occupied_piece.owner == piece.owner
         return False
 
-    def get_moves_for_piece(self, piece: 'Piece') -> list['Move']:
-        """Get all valid moves for a specific piece"""
+    def get_moves_for_piece(self, piece: 'Piece') -> list:
+        """Get all valid moves for a piece"""
         valid_moves = []
-        valid_directions = ['n', 'e', 's', 'w', 'f', 'b']
+        valid_directions = ['n', 's', 'e', 'w', 'f', 'b']
         
-        # Check single direction moves
-        for dir1 in valid_directions:
-            temp_move = Move(piece, [dir1], None, None)
-            if self.is_valid_direction(temp_move):
-                valid_moves.append(temp_move)
+        # First check if piece is surrounded by friendlies
+        if self.is_surrounded_by_friendlies(piece):
+            return []  # Return empty list if surrounded
+            
+        # Try single moves
+        for direction in valid_directions:
+            move = Move(piece, [direction], None, None)
+            if self.is_valid_direction(move):
+                valid_moves.append(move)
         
-        # Check two direction moves
+        # Try double moves
         for dir1 in valid_directions:
             for dir2 in valid_directions:
-                temp_move = Move(piece, [dir1, dir2], None, None)
-                if self.is_valid_move(temp_move):
-                    valid_moves.append(temp_move)
+                move = Move(piece, [dir1, dir2], None, None)
+                if self.is_valid_move(move):
+                    valid_moves.append(move)
         
         return valid_moves
+
+    def is_surrounded_by_friendlies(self, piece: 'Piece') -> bool:
+        """Check if a piece is surrounded by friendly pieces"""
+        x, y = piece.position._x, piece.position._y
+        era = piece.position._era
+        
+        # Check all adjacent spaces (north, south, east, west)
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        
+        for dx, dy in directions:
+            new_x, new_y = x + dx, y + dy
+            
+            # If position is off board, continue
+            if not (0 <= new_x < 4 and 0 <= new_y < 4):
+                continue
+                
+            # Get the space and check if it's occupied
+            space = era.grid[new_y][new_x]
+            if not space.isOccupied():
+                return False  # Found an empty space, not surrounded
+            
+            # Check if occupied by opponent's piece
+            if space.getPiece().owner != piece.owner:
+                return False  # Found opponent's piece, not surrounded
+        
+        # If we get here, all valid adjacent spaces are occupied by friendly pieces
+        return True
 
     def get_all_valid_moves(self, player: 'PlayerStrategy') -> dict:
         """Get all valid moves for pieces in the active era"""
@@ -176,15 +207,11 @@ class Board:
             
         new_x, new_y, new_era = result
         
-        # Check if destination space is occupied (for any direction including temporal)
+        # Check if moving into own piece (for any direction)
         space = new_era.grid[new_y][new_x]
         if space.isOccupied():
             piece = space.getPiece()
-            if direction in ['f', 'b']:
-                # Temporal moves are never allowed into occupied spaces
-                return False
-            elif piece.owner == move.piece.owner:
-                # Moving directly into own piece is never valid
+            if piece.owner == move.piece.owner:
                 return False
         
         return True

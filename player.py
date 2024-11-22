@@ -169,31 +169,44 @@ class RandomAIPlayer(PlayerStrategy):
 
 class HumanPlayer(PlayerStrategy):
     def getMove(self, board: 'Board') -> Move:
-        """Get move from human player"""
-        # First check if there are any valid moves in current era
-        valid_moves = board.get_all_valid_moves(self)
+        """Get move from human player input"""
+        # Get valid moves for all pieces in current era
+        valid_moves = {}
+        max_directions = 1
         
+        # Get pieces in current era
+        pieces = self.current_era.getPieces(self)
+        if not pieces:
+            print("No copies to move")
+            next_era = self._input_next_era(board)
+            return Move(None, [], next_era, 
+                       "b_player" if self._color == "w_player" else "w_player")
+        
+        # Get valid moves for each piece
+        for piece in pieces:
+            piece_moves = board.get_moves_for_piece(piece)
+            if piece_moves:  # Only include pieces that can actually move
+                valid_moves[piece] = piece_moves
+                max_directions = max(max_directions, 
+                                   max(len(move.directions) for move in piece_moves))
+        
+        # If no pieces can move
         if not valid_moves:
             print("No copies to move")
             next_era = self._input_next_era(board)
-            return Move(None, None, next_era, "b_player" if self._color == "w_player" else "w_player")
+            return Move(None, [], next_era, 
+                       "b_player" if self._color == "w_player" else "w_player")
         
-        # Get maximum number of directions available for any piece
-        max_directions = max(len(move.directions) 
-                           for moves in valid_moves.values() 
-                           for move in moves)
-        
-        # Select piece
+        # Get piece selection from user
         piece = self._input_piece(board, valid_moves)
+        if piece is None:
+            return None
         
-        # Get the piece's valid moves
-        piece_valid_moves = valid_moves[piece]
-        
-        # If piece can only make one move and it's the only piece that can move
-        if (len(piece_valid_moves) == 1 and 
-            len(piece_valid_moves[0].directions) == 1 and 
-            len(valid_moves) == 1):
-            directions = piece_valid_moves[0].directions
+        # Special case: only one piece can move and it can only make one move
+        if (len(valid_moves) == 1 and 
+            len(valid_moves[piece]) == 1 and 
+            len(valid_moves[piece][0].directions) == 1):
+            directions = valid_moves[piece][0].directions
         else:
             directions = self._input_directions(board, piece, max_directions)
             if not directions:
@@ -208,7 +221,30 @@ class HumanPlayer(PlayerStrategy):
         while True:
             piece_id = input("Select a copy to move\n").strip().upper()
             
-            # Find piece with matching ID in valid moves
+            # First check if piece exists in any era
+            piece_found = False
+            for piece in self.current_era.getPieces(self):
+                if piece.id == piece_id:
+                    piece_found = True
+                    break
+            
+            # If piece wasn't found in current era, check other eras
+            if not piece_found:
+                for era in [board.past, board.present, board.future]:
+                    if era != self.current_era:
+                        for piece in era.getPieces(self):
+                            if piece.id == piece_id and piece.owner == self._color:
+                                print("Cannot select a copy from an inactive era")
+                                piece_found = True
+                                break
+                    if piece_found:
+                        break
+                
+                if not piece_found:
+                    print("Not a valid copy")
+                continue
+            
+            # Now check if the piece is in valid moves
             selected_piece = None
             for piece in valid_moves.keys():
                 if piece.id == piece_id:
@@ -216,9 +252,18 @@ class HumanPlayer(PlayerStrategy):
                     break
             
             if not selected_piece:
-                print("Not a valid copy")
+                print("That copy cannot move")
                 continue
             
+            # Check if piece can make moves of maximum length
+            max_move_length = max(len(move.directions) for moves in valid_moves.values() 
+                                for move in moves)
+            piece_max_length = max(len(move.directions) for move in valid_moves[selected_piece])
+            
+            if piece_max_length < max_move_length:
+                print("That copy cannot move")
+                continue
+                
             return selected_piece
 
     def _input_directions(self, board: 'Board', piece: 'Piece', max_directions: int):
@@ -244,7 +289,7 @@ class HumanPlayer(PlayerStrategy):
             # Check if this is a valid first move
             temp_move = Move(piece, [direction], None, None)
             if not board.is_valid_direction(temp_move):
-                print("Invalid move")
+                print("Not a valid direction")
                 continue
                 
             directions.append(direction)
