@@ -1,12 +1,12 @@
 import sys
 import pickle
+import time
 
 from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
 from board import Board
 from movehistory import MoveHistory
-from player import PlayerFactory
-
+from player import PlayerFactory, HumanPlayer
 
 from enum import Enum
 from typing import Optional, Dict, Callable
@@ -108,21 +108,29 @@ class Game:
                 winner = "white" if self.current_player == self.b_player else "black"
                 print(f"{winner} has won")
                 
-                # Ask to play again
-                play_again = input("Play again?\n").strip().lower()
-                if play_again == "yes":
-                    # Reset the game
-                    self.__init__(
-                        white_type=self.w_player.__class__.__name__.lower().replace("player", ""),
-                        black_type=self.b_player.__class__.__name__.lower().replace("player", ""),
-                        undo_redo="on" if self.undo_redo else "off",
-                        score="on" if self.score else "off"
-                    )
-                    continue
+                # Ask to play again only if at least one human player
+                if isinstance(self.w_player, HumanPlayer) or isinstance(self.b_player, HumanPlayer):
+                    play_again = input("Play again?\n").strip().lower()
+                    if play_again == "yes":
+                        self.__init__(
+                            white_type=self.w_player.__class__.__name__.lower().replace("player", ""),
+                            black_type=self.b_player.__class__.__name__.lower().replace("player", ""),
+                            undo_redo="on" if self.undo_redo else "off",
+                            score="on" if self.score else "off"
+                        )
+                        continue
+                    else:
+                        sys.exit(0)
                 else:
                     sys.exit(0)
 
-            if self.undo_redo:
+            # Add delay between moves if both players are AI
+            if (not isinstance(self.w_player, HumanPlayer) and 
+                not isinstance(self.b_player, HumanPlayer)):
+                time.sleep(1)  # 1 second delay between moves
+
+            if self.undo_redo and (isinstance(self.w_player, HumanPlayer) or 
+                                  isinstance(self.b_player, HumanPlayer)):
                 choice = self._handle_undo_redo()
                 if choice in ['u', 'r']:
                     continue
@@ -130,6 +138,8 @@ class Game:
             # Get and execute move
             move = self.current_player.getMove(self.board)
             if move and self.board.makeMove(move):
+                print(move)
+                
                 self.move_history.addMove(move)
                 # Switch players and increment turn
                 self.current_player = self.b_player if self.current_player == self.w_player else self.w_player

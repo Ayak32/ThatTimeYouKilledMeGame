@@ -147,11 +147,9 @@ class Move:
     def __str__(self):
         """String representation of the move"""
         if self.piece is None:
-            # Era-change-only move
-            return f"Change focus to {self.next_era.name}"
+            return f"Selected move: None,None,None,{self.next_era.name}"
         else:
-            # Normal move with piece
-            return f"{self.piece.id},{','.join(self.directions)},{self.next_era.name}"
+            return f"Selected move: {self.piece.id},{','.join(self.directions)},{self.next_era.name}"
 
     # def _getNameByEra(self, era_name: str):
     #     """Get era object by name"""

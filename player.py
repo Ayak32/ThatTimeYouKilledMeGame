@@ -159,13 +159,44 @@ class HeuristicAIPlayer(PlayerStrategy):
     #     pass
 
 class RandomAIPlayer(PlayerStrategy):
-    def getMove(self, board):
+    def getMove(self, board: 'Board') -> Move:
         """
         Randomly select a valid move from available moves
         """
+        # Get pieces in current era
+        pieces = self.current_era.getPieces(self)
+        if not pieces:
+            # If no pieces in current era, randomly select next era
+            possible_eras = [board.past, board.present, board.future]
+            possible_eras.remove(self.current_era)
+            next_era = random.choice(possible_eras)
+            return Move(None, [], next_era, 
+                       "b_player" if self._color == "w_player" else "w_player")
         
-        possible_moves = board.getValidMoves(self)
-        return random.choice(possible_moves) if possible_moves else None
+        # Get all valid moves for each piece
+        all_valid_moves = []
+        for piece in pieces:
+            piece_moves = board.get_moves_for_piece(piece)
+            all_valid_moves.extend(piece_moves)
+        
+        if not all_valid_moves:
+            # If no valid moves, randomly select next era
+            possible_eras = [board.past, board.present, board.future]
+            possible_eras.remove(self.current_era)
+            next_era = random.choice(possible_eras)
+            return Move(None, [], next_era, 
+                       "b_player" if self._color == "w_player" else "w_player")
+        
+        # Select random move
+        selected_move = random.choice(all_valid_moves)
+        
+        # Add random next era to the move
+        possible_eras = [board.past, board.present, board.future]
+        possible_eras.remove(self.current_era)
+        next_era = random.choice(possible_eras)
+        
+        return Move(selected_move.piece, selected_move.directions, next_era,
+                   "b_player" if self._color == "w_player" else "w_player")
 
 class HumanPlayer(PlayerStrategy):
     def getMove(self, board: 'Board') -> Move:

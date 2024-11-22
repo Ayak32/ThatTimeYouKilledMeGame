@@ -228,37 +228,34 @@ class Board:
 
     def is_valid_direction(self, move: 'Move') -> bool:
         """Check if a single direction move is valid"""
+        if not move.piece:
+            return False
+            
         current_pos = move.piece.position
         direction = move.directions[0]
         
         # Get new position after move
-        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        result = self.get_new_position(current_pos._x, current_pos._y, 
+                                     direction, current_pos._era)
         if result is None:
             return False
             
         new_x, new_y, new_era = result
         
-        # If it's a temporal move (f/b), just check if it's valid
+        # For temporal movement, check if destination space is occupied
         if direction in ['f', 'b']:
-            return True
-            
-        # For spatial moves, check the destination space
-        new_space = new_era.grid[new_y][new_x]
+            destination_space = new_era.grid[new_y][new_x]
+            if destination_space.isOccupied():
+                return False
         
-        # If space is empty, move is valid
-        if not new_space.isOccupied():
-            return True
-            
-        # If space is occupied, check if it's an opponent's piece
-        piece = new_space.getPiece()
-        # Only the first piece in the chain needs to be an opponent's piece
-        if piece.owner == move.piece.owner:
-            return False
-            
-        # Check if chain push is possible
-        dx = new_x - current_pos._x
-        dy = new_y - current_pos._y
-        return new_era._can_push_chain(Position(new_x, new_y, new_era), dx, dy)
+        # For spatial movement
+        elif direction in ['n', 's', 'e', 'w']:
+            # Check if new position is occupied by friendly piece
+            space = current_pos._era.grid[new_y][new_x]
+            if space.isOccupied() and space.getPiece().owner == move.piece.owner:
+                return False
+        
+        return True
 
     def _can_push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
         """Check if a chain push is possible without actually executing it"""
@@ -409,7 +406,7 @@ class Space:
         return piece
 
 class Era:
-    def __init__(self, name, board=None):
+    def __init__(self, name, board):
         self.name = name
         self.board = board
         self.grid = [[Space(x, y, self) for x in range(4)]
