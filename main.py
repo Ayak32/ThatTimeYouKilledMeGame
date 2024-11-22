@@ -24,6 +24,7 @@ class Game:
         """Initialize the game with specified player types and settings."""
     
         self.board = Board()
+        self.board.game = self
         self.board.score = score.lower() == "on"
         
         self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
@@ -105,77 +106,61 @@ class Game:
         while True:  # Outer loop for multiple games
             while self.state == GameState.PLAYING:
                 self._display_eras()
-                # print(f"Turn: {self.turn_number}, Current player: {'white' if self.current_player == self.w_player else 'black'}")
+                
+                # Display scores if enabled and at least one player is human
+                if self.score and (isinstance(self.current_player, HumanPlayer) or 
+                                 isinstance(self.b_player if self.current_player == self.w_player else self.w_player, HumanPlayer)):
+                    # Always display white's score first
+                    self._display_scores(self.w_player, "white")
+                    self._display_scores(self.b_player, "black")
+                
+                # Handle undo/redo if enabled
+                if self.undo_redo:
+                    choice = self._handle_undo_redo()
+                    if choice != "next":
+                        continue
                 
                 # Get and execute move
                 move = self.current_player.getMove(self.board)
                 if move:
                     success = self.board.makeMove(move)
                     if success:
-                        self.move_history.addMove(move)
+                        self.move_history.save_state(
+                            self.board,
+                            "w_player" if self.current_player == self.w_player else "b_player",
+                            self.turn_number
+                        )
                         print(move)
-                        
-                        # Update game state
                         self._handle_game_end()
                         self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                         self.turn_number += 1
             
             # Game has ended, ask to play again
-            print("play again?")
+            print("Play again? (yes/no)")
             play_again = input().lower().strip()
             if play_again != "yes":
                 break
-                
-            # Reset the game for a new round
-            self.reset_game()  # No need to call _setupBoard separately anymore
+            
+            self.reset_game()
     
     def _handle_undo_redo(self) -> str:
-        """Handle undo/redo functionality."""
+        """Handle undo/redo functionality"""
         while True:
-            choice = input("Enter 'undo', 'redo', or 'next': ").lower()
+            choice = input("undo, redo, or next\n").lower().strip()
             if choice == "undo":
-                if self.move_history.undo(self.board):
-                    self.turn_number -= 1
-                    self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                if self.move_history.undo(self):
+                    print("Undid last move")
                 else:
-                    print("Cannot undo further")
+                    continue
             elif choice == "redo":
-                if self.move_history.redo(self.board):
-                    self.turn_number += 1
-                    self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                if self.move_history.redo(self):
+                    print("Redid last move")
                 else:
-                    print("Cannot redo further")
+                    continue
             elif choice == "next":
                 return choice
             else:
-                print("Invalid choice")
-    
-    def _display_scores(self):
-        """Display current game scores for both players."""
-        w_scores = self._calculate_player_scores(self.w_player)
-        b_scores = self._calculate_player_scores(self.b_player)
-        
-        print("\nScores:")
-        print(f"White - Era Presence: {w_scores['era_presence']}, "
-              f"Piece Advantage: {w_scores['piece_advantage']}, "
-              f"Supply: {w_scores['supply']}, "
-              f"Centrality: {w_scores['centrality']}, "
-              f"Focus: {w_scores['focus']}")
-        print(f"Black - Era Presence: {b_scores['era_presence']}, "
-              f"Piece Advantage: {b_scores['piece_advantage']}, "
-              f"Supply: {b_scores['supply']}, "
-              f"Centrality: {b_scores['centrality']}, "
-              f"Focus: {b_scores['focus']}")
-    
-    # def _calculate_player_scores(self, player) -> Dict[str, int]:
-    #     """Calculate various scores for a player."""
-    #     return {
-    #         'era_presence': self._calculate_era_presence(player),
-    #         'piece_advantage': self._calculate_piece_advantage(player),
-    #         'supply': self._calculate_supply(player),
-    #         'centrality': self._calculate_centrality(player),
-    #         'focus': self._calculate_focus(player)
-    #     }
+                continue
     
     def _handle_game_end(self):
         """Check if the game has ended and update state accordingly"""
@@ -225,47 +210,6 @@ class Game:
         # Setup the board
         self.board._setupBoard()
 
-    # def _calculate_era_presence(self, player) -> int:
-    #     """Calculate number of eras where player has pieces."""
-    #     count = 0
-    #     for era in [self.board.past, self.board.present, self.board.future]:
-    #         if era.getPieces(player.color):
-    #             count += 1
-    #     return count
-
-    # def _calculate_piece_advantage(self, player) -> int:
-    #     """Calculate piece advantage over opponent."""
-    #     player_pieces = sum(len(era.getPieces(player.color)) 
-    #                       for era in [self.board.past, self.board.present, self.board.future])
-    #     opponent_pieces = sum(len(era.getPieces(self._get_opponent(player).color)) 
-    #                         for era in [self.board.past, self.board.present, self.board.future])
-    #     return player_pieces - opponent_pieces
-
-    # def _calculate_supply(self, player) -> int:
-    #     """Calculate remaining supply for player."""
-    #     total_pieces = sum(len(era.getPieces(player.color)) 
-    #                      for era in [self.board.past, self.board.present, self.board.future])
-    #     return 9 - total_pieces  # Assuming 9 total pieces per player
-
-    # def _calculate_centrality(self, player) -> int:
-    #     """Calculate how many pieces are in central positions."""
-    #     central_count = 0
-    #     central_positions = [(1,1), (1,2), (2,1), (2,2)]
-    #     for era in [self.board.past, self.board.present, self.board.future]:
-    #         for x, y in central_positions:
-    #             space = era.getSpace(x, y)
-    #             if space.isOccupied() and space.getPiece().owner == player.color:
-    #                 central_count += 1
-    #     return central_count
-
-    # def _calculate_focus(self, player) -> int:
-    #     """Calculate number of pieces in current focus era."""
-    #     return len(self.board.current_era.getPieces(player.color))
-
-    # def _get_opponent(self, player):
-    #     """Get the opponent of the given player."""
-    #     return self.b_player if player == self.w_player else self.w_player
-
     def get_winner(self) -> GameState:
         """Determine the winner of the game"""
         w_pieces = 0
@@ -292,6 +236,24 @@ class Game:
             if len(era.getPieces(player)) > 0:
                 count += 1
         return count
+
+    def _display_scores(self, player, color: str):
+        """Display scores for a player"""
+        # Count eras with pieces
+        eras = self._count_player_eras(player)
+        
+        # Count active pieces and supply
+        pieces = len(player._pieces)
+        supply = len(player._supply)
+        
+        # Count pieces in focused era
+        pieces_in_focus = len(player.current_era.getPieces(player))
+        
+        # Use HeuristicAIPlayer's evaluation methods
+        advantage = HeuristicAIPlayer._evaluate_piece_advantage(self.board, player)
+        centrality = HeuristicAIPlayer._evaluate_centrality(self.board, player)
+        
+        print(f"{color}'s score: {eras} eras, {advantage} advantage, {supply} supply, {centrality} centrality, {pieces_in_focus} in focus")
 
 
 

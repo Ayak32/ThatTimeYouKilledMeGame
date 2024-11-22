@@ -1,30 +1,52 @@
 from position import Position
+from copy import deepcopy
+
+class GameMemento:
+    """Stores a snapshot of the game state"""
+    def __init__(self, board_state, current_player, turn_number):
+        self.board_state = deepcopy(board_state)
+        self.current_player = current_player  # Store player type (w_player/b_player)
+        self.turn_number = turn_number
+
 class MoveHistory():
     def __init__(self):
-        self.moves = []  # stack of moves
-        self.undoneMove = []  # stack of moves
+        self.history = []  # List of GameMemento objects
+        self.current_index = -1  # Points to current state in history
     
-    def addMove(self, move):
-        """Add a move to the history"""
-        self.moves.append(move)
-        # Clear undone moves when a new move is made
-        self.undoneMove = []
+    def save_state(self, board, current_player, turn_number):
+        """Save current game state"""
+        # If we're not at the end of history, truncate future states
+        if self.current_index < len(self.history) - 1:
+            self.history = self.history[:self.current_index + 1]
+        
+        # Create and save new memento
+        memento = GameMemento(board, current_player, turn_number)
+        self.history.append(memento)
+        self.current_index += 1
     
-    def undo(self):
-        """Undo the last move"""
-        if self.moves:
-            move = self.moves.pop()
-            self.undoneMove.append(move)
-            return move
-        return None
+    def undo(self, game):
+        """Restore previous game state"""
+        if self.current_index > 0:
+            self.current_index -= 1
+            memento = self.history[self.current_index]
+            self._restore_state(game, memento)
+            return True
+        return False
     
-    def redo(self):
-        """Redo the last undone move"""
-        if self.undoneMove:
-            move = self.undoneMove.pop()
-            self.moves.append(move)
-            return move
-        return None
+    def redo(self, game):
+        """Restore next game state"""
+        if self.current_index < len(self.history) - 1:
+            self.current_index += 1
+            memento = self.history[self.current_index]
+            self._restore_state(game, memento)
+            return True
+        return False
+    
+    def _restore_state(self, game, memento):
+        """Helper method to restore game state from memento"""
+        game.board = deepcopy(memento.board_state)
+        game.current_player = game.w_player if memento.current_player == "w_player" else game.b_player
+        game.turn_number = memento.turn_number
 
 
 

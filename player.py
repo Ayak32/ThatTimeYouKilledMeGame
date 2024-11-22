@@ -90,15 +90,17 @@ class PlayerStrategy(ABC):
         pass
 
 class HeuristicAIPlayer(PlayerStrategy):
-    def getMove(self, board: Board) -> Move:
+    def getMove(self, board: 'Board') -> Move:
         """Get the best move based on heuristic evaluation"""
         valid_moves = board.getValidMoves(self)
         
         # Calculate and display current scores for both players
-        if board.score:
-            opponent = board.b_player if self._color == "w_player" else board.w_player
-            self._display_scores(board, self, "white" if self._color == "w_player" else "black")
-            self._display_scores(board, opponent, "black" if self._color == "w_player" else "white")
+        # Only display if both players are AI
+        if board.score and (isinstance(board.w_player, (HeuristicAIPlayer, RandomAIPlayer)) and 
+                          isinstance(board.b_player, (HeuristicAIPlayer, RandomAIPlayer))):
+            # Always display white's score first
+            board.game._display_scores(board.w_player, "white")
+            board.game._display_scores(board.b_player, "black")
         
         # If no valid moves, just change era
         if not valid_moves:
@@ -121,14 +123,14 @@ class HeuristicAIPlayer(PlayerStrategy):
             if success:
                 # Check if this is a winning move
                 opponent = board.b_player if self._color == "w_player" else board.w_player
-                if self._count_eras_with_pieces(board, opponent) <= 1:
+                if self._evaluate_era_presence(board) <= 1:
                     score = 9999
                 else:
-                    # Calculate weighted sum (using suggested weights)
+                    # Calculate weighted sum
                     score = (3 * self._evaluate_era_presence(board) + 
-                            2 * self._evaluate_piece_advantage(board) + 
+                            2 * HeuristicAIPlayer._evaluate_piece_advantage(board, self) + 
                             1 * len(self._supply) + 
-                            1 * self._evaluate_centrality(board) + 
+                            1 * HeuristicAIPlayer._evaluate_centrality(board, self) + 
                             1 * self._evaluate_focus(board, move.next_era))
                 
                 # Undo the move simulation
@@ -148,16 +150,6 @@ class HeuristicAIPlayer(PlayerStrategy):
             
         return best_move
 
-    def _display_scores(self, board: 'Board', player: 'PlayerStrategy', player_name: str):
-        """Display the component scores for a player"""
-        era_count = self._count_eras_with_pieces(board, player)
-        piece_advantage = self._evaluate_piece_advantage(board) if player == self else -self._evaluate_piece_advantage(board)
-        supply = len(player._supply)
-        centrality = self._evaluate_centrality(board) if player == self else self._count_central_pieces(board, player)
-        focus = len(player.current_era.getPieces(player))
-        
-        print(f"{player_name}'s score: {era_count} eras, {piece_advantage} advantage, {supply} supply, {centrality} centrality, {focus} in focus")
-
     def _count_eras_with_pieces(self, board: 'Board', player: 'PlayerStrategy') -> int:
         """Count number of eras containing player's pieces"""
         count = 0
@@ -166,54 +158,34 @@ class HeuristicAIPlayer(PlayerStrategy):
                 count += 1
         return count
 
-    def _count_central_pieces(self, board: 'Board', player: 'PlayerStrategy') -> int:
-        """Count pieces in central positions for a specific player"""
-        central_count = 0
-        central_positions = {(1,1), (1,2), (2,1), (2,2)}
-        
+    @staticmethod
+    def _evaluate_piece_advantage(board: 'Board', player) -> int:
+        """Evaluate piece advantage (positive = advantage, negative = disadvantage)"""
+        opponent = board.b_player if player._color == "w_player" else board.w_player
+        return len(player._pieces) - len(opponent._pieces)
+
+    @staticmethod
+    def _evaluate_centrality(board: 'Board', player) -> int:
+        """Evaluate how many pieces are in central positions"""
+        centrality = 0
         for era in [board.past, board.present, board.future]:
             for piece in era.getPieces(player):
-                if (piece.position._x, piece.position._y) in central_positions:
-                    central_count += 1
-        
-        return central_count
+                x, y = piece.position._x, piece.position._y
+                # Center positions (1,1), (1,2), (2,1), (2,2) are worth 1 point
+                if 0 < x < 3 and 0 < y < 3:
+                    centrality += 1
+        return centrality
 
     def _evaluate_era_presence(self, board: 'Board') -> int:
-        """Count number of eras with player's pieces"""
-        count = 0
+        """Evaluate number of eras with pieces"""
+        eras_with_pieces = 0
         for era in [board.past, board.present, board.future]:
             if len(era.getPieces(self)) > 0:
-                count += 1
-        return count
+                eras_with_pieces += 1
+        return eras_with_pieces
 
-    def _evaluate_piece_advantage(self, board: 'Board') -> int:
-        """Calculate piece advantage over opponent"""
-        opponent = board.b_player if self._color == "w_player" else board.w_player
-        my_pieces = 0
-        opp_pieces = 0
-        
-        for era in [board.past, board.present, board.future]:
-            my_pieces += len(era.getPieces(self))
-            opp_pieces += len(era.getPieces(opponent))
-        
-        return my_pieces - opp_pieces
-
-    def _evaluate_centrality(self, board: 'Board') -> int:
-        """Count pieces in central positions"""
-        central_count = 0
-        central_positions = {(1,1), (1,2), (2,1), (2,2)}
-        
-        for era in [board.past, board.present, board.future]:
-            for piece in era.getPieces(self):
-                if (piece.position._x, piece.position._y) in central_positions:
-                    central_count += 1
-        
-        return central_count
-
-    def _evaluate_focus(self, board: 'Board', next_era: 'Era') -> int:
-        """Count pieces in the next focused era"""
-        if next_era is None:
-            return 0
+    def _evaluate_focus(self, board: 'Board', next_era) -> int:
+        """Evaluate pieces in focused era"""
         return len(next_era.getPieces(self))
 
     def _get_best_era(self, board: 'Board') -> 'Era':
