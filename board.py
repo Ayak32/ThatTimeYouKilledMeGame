@@ -14,9 +14,9 @@ class Board:
         self.b_player = None
         self.current_player = None
 
-        self.past = Era("past")
-        self.present = Era("present")
-        self.future = Era("future")
+        self.past = Era("past", self)
+        self.present = Era("present", self)
+        self.future = Era("future", self)
         
         # Current focus starts on past era for white player
         
@@ -190,67 +190,95 @@ class Board:
         }
         return era_map.get(era_name.lower())
 
-    def is_valid_direction(self, move: 'Move') -> bool:
-        """Check if a single direction move is valid"""
-        if move.piece is None:
+    def is_valid_move(self, move: 'Move') -> bool:
+        """Check if a complete move is valid"""
+        if not move.piece:  # Era change only move
             return True
             
         current_pos = move.piece.position
-        if current_pos is None:
-            return False
-            
-        direction = move.directions[0]
-        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        current_era = current_pos._era
         
+        # For each direction in the move
+        for i, direction in enumerate(move.directions):
+            # Get new position after this direction
+            result = self.get_new_position(current_pos._x, current_pos._y, 
+                                         direction, current_era)
+            if result is None:
+                return False
+                
+            new_x, new_y, new_era = result
+            
+            # Create a temporary move for this direction
+            temp_piece = move.piece
+            if i > 0:  # For second direction, update piece position
+                temp_piece = Piece(move.piece.id, move.piece.owner, None)
+                temp_piece.position = Position(current_pos._x, current_pos._y, current_era)
+            
+            temp_move = Move(temp_piece, [direction], None, None)
+            
+            # Check if this individual direction is valid
+            if not self.is_valid_direction(temp_move):
+                return False
+            
+            # Update position for next direction
+            current_pos = Position(new_x, new_y, new_era)
+            current_era = new_era
+            
+        return True
+
+    def is_valid_direction(self, move: 'Move') -> bool:
+        """Check if a single direction move is valid"""
+        current_pos = move.piece.position
+        direction = move.directions[0]
+        
+        # Get new position after move
+        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
         if result is None:
             return False
             
         new_x, new_y, new_era = result
         
-        # Check if moving into own piece (for any direction)
-        space = new_era.grid[new_y][new_x]
-        if space.isOccupied():
-            piece = space.getPiece()
-            if piece.owner == move.piece.owner:
-                return False
-        
-        return True
-
-    def is_valid_move(self, move: 'Move') -> bool:
-        """Check if a complete move is valid"""
-        if move.piece is None:  # Era change only
+        # If it's a temporal move (f/b), just check if it's valid
+        if direction in ['f', 'b']:
             return True
             
-        current_pos = move.piece.position
-        if current_pos is None:
-            return False
-            
-        # Check first direction
-        result = self.get_new_position(current_pos._x, current_pos._y, move.directions[0], current_pos._era)
-        if result is None:
-            return False
-            
-        # Use the position after first move to check second direction
-        if len(move.directions) > 1:
-            new_x, new_y, new_era = result
-            temp_pos = Position(new_x, new_y, new_era)
-            result = self.get_new_position(temp_pos._x, temp_pos._y, move.directions[1], temp_pos._era)
-            if result is None:
-                return False
-                
-            new_x, new_y, new_era = result
-            # Check final destination
-            space = new_era.grid[new_y][new_x]
-            if space.isOccupied():
-                piece = space.getPiece()
-                if move.directions[1] in ['f', 'b']:
-                    # Temporal moves are never allowed into occupied spaces
-                    return False
-                elif piece.owner == move.piece.owner:
-                    # Moving into own piece is never valid
-                    return False
+        # For spatial moves, check the destination space
+        new_space = new_era.grid[new_y][new_x]
         
-        return True
+        # If space is empty, move is valid
+        if not new_space.isOccupied():
+            return True
+            
+        # If space is occupied, check if it's an opponent's piece
+        piece = new_space.getPiece()
+        # Only the first piece in the chain needs to be an opponent's piece
+        if piece.owner == move.piece.owner:
+            return False
+            
+        # Check if chain push is possible
+        dx = new_x - current_pos._x
+        dy = new_y - current_pos._y
+        return new_era._can_push_chain(Position(new_x, new_y, new_era), dx, dy)
+
+    def _can_push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+        """Check if a chain push is possible without actually executing it"""
+        current_pos = start_pos
+        
+        while True:
+            next_x = current_pos._x + dx
+            next_y = current_pos._y + dy
+            
+            # If next position is off board, chain push is possible
+            if not (0 <= next_x < 4 and 0 <= next_y < 4):
+                return True
+                
+            # If next position is empty, chain push is possible
+            next_space = self.grid[next_y][next_x]
+            if not next_space.isOccupied():
+                return True
+                
+            # Move to next position
+            current_pos = Position(next_x, next_y, current_pos._era)
 
     def movePiece(self, from_position: Position, to_position: Position) -> bool:
         """Move a piece from one position to another, handling pushing chains"""
@@ -278,15 +306,29 @@ class Board:
         to_space.setPiece(moving_piece)
         return True
 
-    def _push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+    def _push_chain(self, start_pos: Position, dx: int, dy: int, board: 'Board') -> bool:
         """
-        Push a chain of pieces in the given direction
-        Returns True if push was successful, False if any piece would be pushed off the board
+        Push a chain of pieces in the given direction.
+        Returns True if push was successful, False if any piece would be pushed off the board.
         """
+        # First check if the chain push is possible
+        if not self._can_push_chain(start_pos, dx, dy):
+            return False
+
         # First, collect all pieces that need to be pushed
         pieces_to_push = []
         current_pos = start_pos
         
+        # Check if the first piece is an opponent's piece
+        first_space = self.grid[start_pos._y][start_pos._x]
+        if not first_space.isOccupied():
+            return True
+            
+        first_piece = first_space.getPiece()
+        if first_piece.owner == board.current_player._color:
+            return False
+            
+        # Now collect all pieces in the chain
         while True:
             space = self.grid[current_pos._y][current_pos._x]
             if not space.isOccupied():
@@ -297,27 +339,22 @@ class Board:
             next_x = current_pos._x + dx
             next_y = current_pos._y + dy
             
+            # If next position is off board, remove last piece and return success
             if not (0 <= next_x < 4 and 0 <= next_y < 4):
-                # Last piece would be pushed off the board
                 if pieces_to_push:
-                    last_piece, _ = pieces_to_push[-1]
-                    # Remove the piece that would be pushed off
-                    self.grid[current_pos._y][current_pos._x].clearPiece()
+                    last_piece, last_pos = pieces_to_push[-1]
+                    self.grid[last_pos._y][last_pos._x].clearPiece()
                 return True
             
             current_pos = Position(next_x, next_y, current_pos._era)
         
-        # Now execute the pushes in reverse order
+        # Execute the pushes in reverse order
         for piece, pos in reversed(pieces_to_push):
-            # Clear the current space
             self.grid[pos._y][pos._x].clearPiece()
-            
-            # Calculate new position
             new_x = pos._x + dx
             new_y = pos._y + dy
-            
-            # Set piece in new position
-            self.grid[new_y][new_x].setPiece(piece)
+            if 0 <= new_x < 4 and 0 <= new_y < 4:
+                self.grid[new_y][new_x].setPiece(piece)
         
         return True
 
@@ -372,8 +409,9 @@ class Space:
         return piece
 
 class Era:
-    def __init__(self, name):
+    def __init__(self, name, board=None):
         self.name = name
+        self.board = board
         self.grid = [[Space(x, y, self) for x in range(4)]
                     for y in range(4)]
         self._setupAdjacency()
@@ -435,7 +473,7 @@ class Era:
             dy = to_position._y - from_position._y
             
             # Try to push the chain of pieces
-            if not self._push_chain(to_position, dx, dy):
+            if not self._push_chain(to_position, dx, dy, self.board):
                 # If push failed, put the original piece back
                 from_space.setPiece(moving_piece)
                 return False
@@ -444,15 +482,29 @@ class Era:
         to_space.setPiece(moving_piece)
         return True
 
-    def _push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+    def _push_chain(self, start_pos: Position, dx: int, dy: int, board: 'Board') -> bool:
         """
-        Push a chain of pieces in the given direction
-        Returns True if push was successful, False if any piece would be pushed off the board
+        Push a chain of pieces in the given direction.
+        Returns True if push was successful, False if any piece would be pushed off the board.
         """
+        # First check if the chain push is possible
+        if not self._can_push_chain(start_pos, dx, dy):
+            return False
+
         # First, collect all pieces that need to be pushed
         pieces_to_push = []
         current_pos = start_pos
         
+        # Check if the first piece is an opponent's piece
+        first_space = self.grid[start_pos._y][start_pos._x]
+        if not first_space.isOccupied():
+            return True
+            
+        first_piece = first_space.getPiece()
+        if first_piece.owner == board.current_player._color:
+            return False
+            
+        # Now collect all pieces in the chain
         while True:
             space = self.grid[current_pos._y][current_pos._x]
             if not space.isOccupied():
@@ -463,26 +515,41 @@ class Era:
             next_x = current_pos._x + dx
             next_y = current_pos._y + dy
             
+            # If next position is off board, remove last piece and return success
             if not (0 <= next_x < 4 and 0 <= next_y < 4):
-                # Last piece would be pushed off the board
                 if pieces_to_push:
-                    last_piece, _ = pieces_to_push[-1]
-                    # Remove the piece that would be pushed off
-                    self.grid[current_pos._y][current_pos._x].clearPiece()
+                    last_piece, last_pos = pieces_to_push[-1]
+                    self.grid[last_pos._y][last_pos._x].clearPiece()
                 return True
             
             current_pos = Position(next_x, next_y, current_pos._era)
         
-        # Now execute the pushes in reverse order
+        # Execute the pushes in reverse order
         for piece, pos in reversed(pieces_to_push):
-            # Clear the current space
             self.grid[pos._y][pos._x].clearPiece()
-            
-            # Calculate new position
             new_x = pos._x + dx
             new_y = pos._y + dy
-            
-            # Set piece in new position
-            self.grid[new_y][new_x].setPiece(piece)
+            if 0 <= new_x < 4 and 0 <= new_y < 4:
+                self.grid[new_y][new_x].setPiece(piece)
         
         return True
+
+    def _can_push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+        """Check if a chain push is possible without actually executing it"""
+        current_pos = start_pos
+        
+        while True:
+            next_x = current_pos._x + dx
+            next_y = current_pos._y + dy
+            
+            # If next position is off board, chain push is possible
+            if not (0 <= next_x < 4 and 0 <= next_y < 4):
+                return True
+                
+            # If next position is empty, chain push is possible
+            next_space = self.grid[next_y][next_x]
+            if not next_space.isOccupied():
+                return True
+                
+            # Move to next position
+            current_pos = Position(next_x, next_y, current_pos._era)
