@@ -24,6 +24,8 @@ class Game:
         """Initialize the game with specified player types and settings."""
     
         self.board = Board()
+        self.board.score = score.lower() == "on"
+        
         self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
         self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
         

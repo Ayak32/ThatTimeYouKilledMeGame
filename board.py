@@ -13,6 +13,7 @@ class Board:
         self.w_player = None
         self.b_player = None
         self.current_player = None
+        self.score = False
 
         self.past = Era("past", self)
         self.present = Era("present", self)

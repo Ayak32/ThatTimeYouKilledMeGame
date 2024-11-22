@@ -147,9 +147,11 @@ class Move:
     def __str__(self):
         """String representation of the move"""
         if self.piece is None:
-            return f"Selected move: None,None,None,{self.next_era.name}"
+            next_era_name = self.next_era.name if self.next_era else "None"
+            return f"Selected move: None,None,None,{next_era_name}"
         else:
-            return f"Selected move: {self.piece.id},{','.join(self.directions)},{self.next_era.name}"
+            next_era_name = self.next_era.name if self.next_era else "None"
+            return f"Selected move: {self.piece.id},{','.join(self.directions)},{next_era_name}"
 
     # def _getNameByEra(self, era_name: str):
     #     """Get era object by name"""
