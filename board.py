@@ -61,6 +61,7 @@ class Board:
     
     # Helper function to calculate new position after a move
     def get_new_position(self, x, y, direction, era=None):
+        """Calculate new position after a move, returning None if invalid"""
         new_x = x
         new_y = y
         new_era = era
@@ -78,6 +79,10 @@ class Board:
             if new_era is None:  # Invalid temporal movement
                 return None
         
+        # Check if new position is within bounds
+        if not (0 <= new_x < 4 and 0 <= new_y < 4):
+            return None
+            
         return (new_x, new_y, new_era)
 
     # Helper function to get era after time travel
@@ -113,82 +118,37 @@ class Board:
             return occupied_piece.owner == piece.owner
         return False
 
-    def get_moves_for_piece(self, piece):
+    def get_moves_for_piece(self, piece: 'Piece') -> list['Move']:
         """Get all valid moves for a specific piece"""
-        if piece is None or piece.position is None:
-            return []
-
         valid_moves = []
-        basic_directions = ['n', 's', 'e', 'w']
-        time_directions = ['f', 'b']
+        valid_directions = ['n', 'e', 's', 'w', 'f', 'b']
         
-        # Get current position details
-        curr_x = piece.position._x
-        curr_y = piece.position._y
-        curr_era = piece.position._era
-
-
-        # First moves (spatial or temporal)
-        first_directions = basic_directions + time_directions
-        for first_dir in first_directions:
-            # Handle spatial movement
-            if first_dir in basic_directions:
-                result = self.get_new_position(curr_x, curr_y, first_dir, curr_era)
-                if result is None:
-                    continue
-                new_x, new_y, new_era = result
-                
-                # Check if move is valid
-                if not self.is_valid_position(new_x, new_y):
-                    continue
-                if self.creates_paradox(new_x, new_y, new_era, piece):
-                    continue
-                
-                # Now check second moves from this new position
-                second_directions = basic_directions + time_directions
-                for second_dir in second_directions:
-                    if second_dir in basic_directions:
-                        result = self.get_new_position(new_x, new_y, second_dir, new_era)
-                        if result is None:
-                            continue
-                        final_x, final_y, final_era = result
-                    else:  # time travel
-                        final_x, final_y = new_x, new_y
-                        final_era = self.get_new_era(new_era, second_dir)
-                    
-                    if (final_era and self.is_valid_position(final_x, final_y) and 
-                        not self.creates_paradox(final_x, final_y, final_era, piece)):
-                        # Check available focus eras (not current era)
-                        for next_focus in ['past', 'present', 'future']:
-                            if next_focus != self.current_player.current_era:
-                                move = Move(piece, [first_dir, second_dir], next_focus, 
-                                         "b_player" if piece.owner == "w_player" else "w_player")
-                                valid_moves.append(move)
-
-            # Handle time travel as first move
-            else:
-                new_x, new_y = curr_x, curr_y
-                new_era = self.get_new_era(curr_era, first_dir)
-                if not new_era or self.creates_paradox(new_x, new_y, new_era, piece):
-                    continue
-                
-                # Second moves must be spatial after time travel
-                for second_dir in basic_directions:
-                    result = self.get_new_position(new_x, new_y, second_dir, new_era)
-                    if result is None:
-                        continue
-                    final_x, final_y, final_era = result
-                    
-                    if (self.is_valid_position(final_x, final_y) and 
-                        not self.creates_paradox(final_x, final_y, new_era, piece)):
-                        # Check available focus eras
-                        for next_focus in ['past', 'present', 'future']:
-                            if next_focus != self.current_player.current_era:
-                                move = Move(piece, [first_dir, second_dir], next_focus,
-                                         "b_player" if piece.owner == "w_player" else "w_player")
-                                valid_moves.append(move)
-
+        # Check single direction moves
+        for dir1 in valid_directions:
+            temp_move = Move(piece, [dir1], None, None)
+            if self.is_valid_direction(temp_move):
+                valid_moves.append(temp_move)
+        
+        # Check two direction moves
+        for dir1 in valid_directions:
+            for dir2 in valid_directions:
+                temp_move = Move(piece, [dir1, dir2], None, None)
+                if self.is_valid_move(temp_move):
+                    valid_moves.append(temp_move)
+        
         return valid_moves
+
+    def get_all_valid_moves(self, player: 'PlayerStrategy') -> dict:
+        """Get all valid moves for pieces in the active era"""
+        moves_by_piece = {}
+        active_pieces = player.current_era.getPieces(player)
+        
+        for piece in active_pieces:
+            valid_moves = self.get_moves_for_piece(piece)
+            if valid_moves:  # Only include pieces that can actually move
+                moves_by_piece[piece] = valid_moves
+        
+        return moves_by_piece
 
     def _getEraByName(self, era_name: str):
         """Get era object by name"""
@@ -200,82 +160,138 @@ class Board:
         return era_map.get(era_name.lower())
 
     def is_valid_direction(self, move: 'Move') -> bool:
-        """Check if a move's direction is valid"""
-        if not move.piece or not move.directions:
-            return False
-            
-        current_pos = move.piece.position
-        
-        # For single direction validation (from _get_single_direction)
-        if len(move.directions) == 1:
-            direction = move.directions[0]
-            
-            # Check if trying to move backward with empty supply
-            if direction == 'b' and not self.current_player._supply:
-                return False
-                
-            # Get new position after move
-            result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
-            if result is None or not self.is_valid_position(result[0], result[1]):
-                return False
-                
-            # For spatial moves, check current era
-            if direction not in ['f', 'b']:
-                space = current_pos._era.grid[result[1]][result[0]]
-                if space.isOccupied() and space.getPiece().owner == move.piece.owner:
-                    return False
-            
-            return True
-            
-        # For full two-direction move validation
-        first_dir, second_dir = move.directions
-        
-        # Get position after first move
-        result1 = self.get_new_position(current_pos._x, current_pos._y, first_dir, current_pos._era)
-        if result1 is None or not self.is_valid_position(result1[0], result1[1]):
-            return False
-            
-        # Check first move in current era
-        if first_dir not in ['f', 'b']:
-            space1 = current_pos._era.grid[result1[1]][result1[0]]
-            if space1.isOccupied() and space1.getPiece().owner == move.piece.owner:
-                return False
-        
-        # Get position after second move
-        result2 = self.get_new_position(result1[0], result1[1], second_dir, result1[2])
-        if result2 is None or not self.is_valid_position(result2[0], result2[1]):
-            return False
-            
-        # Check final position in destination era
-        final_space = result2[2].grid[result2[1]][result2[0]]
-        if final_space.isOccupied() and final_space.getPiece().owner == move.piece.owner:
-            return False
-            
-        return True
-
-    def is_valid_move(self, move):
-        """Validate if a move is legal"""
-        # Handle era-change-only moves
+        """Check if a single direction move is valid"""
         if move.piece is None:
             return True
             
-        # For moves with pieces, validate ownership and other rules
-        if move.piece.owner != self.current_player._color:
+        current_pos = move.piece.position
+        if current_pos is None:
             return False
             
-        # Validate each direction in the move
-        current_pos = move.piece.position
-        for direction in move.directions:
-            if not self.is_valid_direction(move):
+        direction = move.directions[0]
+        result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        
+        if result is None:
+            return False
+            
+        new_x, new_y, new_era = result
+        
+        # Check if destination space is occupied (for any direction including temporal)
+        space = new_era.grid[new_y][new_x]
+        if space.isOccupied():
+            piece = space.getPiece()
+            if direction in ['f', 'b']:
+                # Temporal moves are never allowed into occupied spaces
                 return False
-            result = self.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+            elif piece.owner == move.piece.owner:
+                # Moving directly into own piece is never valid
+                return False
+        
+        return True
+
+    def is_valid_move(self, move: 'Move') -> bool:
+        """Check if a complete move is valid"""
+        if move.piece is None:  # Era change only
+            return True
+            
+        current_pos = move.piece.position
+        if current_pos is None:
+            return False
+            
+        # Check first direction
+        result = self.get_new_position(current_pos._x, current_pos._y, move.directions[0], current_pos._era)
+        if result is None:
+            return False
+            
+        # Use the position after first move to check second direction
+        if len(move.directions) > 1:
+            new_x, new_y, new_era = result
+            temp_pos = Position(new_x, new_y, new_era)
+            result = self.get_new_position(temp_pos._x, temp_pos._y, move.directions[1], temp_pos._era)
             if result is None:
                 return False
+                
             new_x, new_y, new_era = result
-            if not self.is_valid_position(new_x, new_y):
-                return False
-            current_pos = Position(new_x, new_y, new_era)
+            # Check final destination
+            space = new_era.grid[new_y][new_x]
+            if space.isOccupied():
+                piece = space.getPiece()
+                if move.directions[1] in ['f', 'b']:
+                    # Temporal moves are never allowed into occupied spaces
+                    return False
+                elif piece.owner == move.piece.owner:
+                    # Moving into own piece is never valid
+                    return False
+        
+        return True
+
+    def movePiece(self, from_position: Position, to_position: Position) -> bool:
+        """Move a piece from one position to another, handling pushing chains"""
+        from_space = self.grid[from_position._y][from_position._x]
+        to_space = self.grid[to_position._y][to_position._x]
+        
+        if not from_space.isOccupied():
+            return False
+        
+        moving_piece = from_space.clearPiece()
+        
+        # If destination is occupied, handle pushing chain
+        if to_space.isOccupied():
+            # Calculate push direction
+            dx = to_position._x - from_position._x
+            dy = to_position._y - from_position._y
             
+            # Try to push the chain of pieces
+            if not self._push_chain(to_position, dx, dy):
+                # If push failed, put the original piece back
+                from_space.setPiece(moving_piece)
+                return False
+        
+        # Move the piece to its new position
+        to_space.setPiece(moving_piece)
+        return True
+
+    def _push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+        """
+        Push a chain of pieces in the given direction
+        Returns True if push was successful, False if any piece would be pushed off the board
+        """
+        # First, collect all pieces that need to be pushed
+        pieces_to_push = []
+        current_pos = start_pos
+        
+        while True:
+            space = self.grid[current_pos._y][current_pos._x]
+            if not space.isOccupied():
+                break
+                
+            pieces_to_push.append((space.getPiece(), current_pos))
+            
+            next_x = current_pos._x + dx
+            next_y = current_pos._y + dy
+            
+            if not (0 <= next_x < 4 and 0 <= next_y < 4):
+                # Last piece would be pushed off the board
+                if pieces_to_push:
+                    last_piece, _ = pieces_to_push[-1]
+                    # Remove the piece that would be pushed off
+                    self.grid[current_pos._y][current_pos._x].clearPiece()
+                return True
+            
+            current_pos = Position(next_x, next_y, current_pos._era)
+        
+        # Now execute the pushes in reverse order
+        for piece, pos in reversed(pieces_to_push):
+            # Clear the current space
+            self.grid[pos._y][pos._x].clearPiece()
+            
+            # Calculate new position
+            new_x = pos._x + dx
+            new_y = pos._y + dy
+            
+            # Set piece in new position
+            self.grid[new_y][new_x].setPiece(piece)
+        
         return True
 
     # TODO: Implement destination validation logic
@@ -376,7 +392,7 @@ class Era:
         return pieces
     
     def movePiece(self, from_position: Position, to_position: Position) -> bool:
-        """Move a piece from one position to another"""
+        """Move a piece from one position to another, handling pushing chains"""
         from_space = self.grid[from_position._y][from_position._x]
         to_space = self.grid[to_position._y][to_position._x]
         
@@ -385,17 +401,61 @@ class Era:
         
         moving_piece = from_space.clearPiece()
         
-        # Handle capture if destination is occupied
+        # If destination is occupied, handle pushing chain
         if to_space.isOccupied():
-            captured_piece = to_space.getPiece()
-            # Only allow capture of opponent's pieces
-            if captured_piece.owner == moving_piece.owner:
-                # Put the piece back if trying to capture own piece
+            # Calculate push direction
+            dx = to_position._x - from_position._x
+            dy = to_position._y - from_position._y
+            
+            # Try to push the chain of pieces
+            if not self._push_chain(to_position, dx, dy):
+                # If push failed, put the original piece back
                 from_space.setPiece(moving_piece)
                 return False
-            # Clear the captured piece
-            to_space.clearPiece()
         
         # Move the piece to its new position
         to_space.setPiece(moving_piece)
+        return True
+
+    def _push_chain(self, start_pos: Position, dx: int, dy: int) -> bool:
+        """
+        Push a chain of pieces in the given direction
+        Returns True if push was successful, False if any piece would be pushed off the board
+        """
+        # First, collect all pieces that need to be pushed
+        pieces_to_push = []
+        current_pos = start_pos
+        
+        while True:
+            space = self.grid[current_pos._y][current_pos._x]
+            if not space.isOccupied():
+                break
+                
+            pieces_to_push.append((space.getPiece(), current_pos))
+            
+            next_x = current_pos._x + dx
+            next_y = current_pos._y + dy
+            
+            if not (0 <= next_x < 4 and 0 <= next_y < 4):
+                # Last piece would be pushed off the board
+                if pieces_to_push:
+                    last_piece, _ = pieces_to_push[-1]
+                    # Remove the piece that would be pushed off
+                    self.grid[current_pos._y][current_pos._x].clearPiece()
+                return True
+            
+            current_pos = Position(next_x, next_y, current_pos._era)
+        
+        # Now execute the pushes in reverse order
+        for piece, pos in reversed(pieces_to_push):
+            # Clear the current space
+            self.grid[pos._y][pos._x].clearPiece()
+            
+            # Calculate new position
+            new_x = pos._x + dx
+            new_y = pos._y + dy
+            
+            # Set piece in new position
+            self.grid[new_y][new_x].setPiece(piece)
+        
         return True
