@@ -6,7 +6,7 @@ from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
 from board import Board
 from movehistory import MoveHistory
-from player import PlayerFactory, HumanPlayer
+from player import PlayerFactory, HumanPlayer, HeuristicAIPlayer, RandomAIPlayer
 
 from enum import Enum
 from typing import Optional, Dict, Callable
@@ -101,52 +101,33 @@ class Game:
         return row_str
     
     def run(self):
-        """Main game loop."""
-        while True:
-            self._display_eras()
+        """Run the game loop"""
+        while True:  # Outer loop for multiple games
+            while self.state == GameState.PLAYING:
+                self._display_eras()
+                # print(f"Turn: {self.turn_number}, Current player: {'white' if self.current_player == self.w_player else 'black'}")
+                
+                # Get and execute move
+                move = self.current_player.getMove(self.board)
+                if move:
+                    success = self.board.makeMove(move)
+                    if success:
+                        self.move_history.addMove(move)
+                        print(move)
+                        
+                        # Update game state
+                        self._handle_game_end()
+                        self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                        self.turn_number += 1
             
-            # Check for game over at the start of each turn
-            if self.board.isGameOver():
-                winner = "white" if self.current_player == self.b_player else "black"
-                print(f"{winner} has won")
+            # Game has ended, ask to play again
+            print("play again?")
+            play_again = input().lower().strip()
+            if play_again != "yes":
+                break
                 
-                # Ask to play again only if at least one human player
-                if isinstance(self.w_player, HumanPlayer) or isinstance(self.b_player, HumanPlayer):
-                    play_again = input("Play again?\n").strip().lower()
-                    if play_again == "yes":
-                        self.__init__(
-                            white_type=self.w_player.__class__.__name__.lower().replace("player", ""),
-                            black_type=self.b_player.__class__.__name__.lower().replace("player", ""),
-                            undo_redo="on" if self.undo_redo else "off",
-                            score="on" if self.score else "off"
-                        )
-                        continue
-                    else:
-                        sys.exit(0)
-                else:
-                    sys.exit(0)
-
-            # Add delay between moves if both players are AI
-            if (not isinstance(self.w_player, HumanPlayer) and 
-                not isinstance(self.b_player, HumanPlayer)):
-                time.sleep(1)  # 1 second delay between moves
-
-            if self.undo_redo and (isinstance(self.w_player, HumanPlayer) or 
-                                  isinstance(self.b_player, HumanPlayer)):
-                choice = self._handle_undo_redo()
-                if choice in ['u', 'r']:
-                    continue
-
-            # Get and execute move
-            move = self.current_player.getMove(self.board)
-            if move and self.board.makeMove(move):
-                print(move)
-                
-                self.move_history.addMove(move)
-                # Switch players and increment turn
-                self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
-                self.board.current_player = self.current_player
-                self.turn_number += 1
+            # Reset the game for a new round
+            self.reset_game()  # No need to call _setupBoard separately anymore
     
     def _handle_undo_redo(self) -> str:
         """Handle undo/redo functionality."""
@@ -197,29 +178,52 @@ class Game:
     #     }
     
     def _handle_game_end(self):
-        """Handle end of game procedures."""
-        self.display_eras()
-        winner = "white" if self.state == GameState.WHITE_WON else "black"
-        print(f"{winner} has won")
+        """Check if the game has ended and update state accordingly"""
+        # Check if either player has pieces in only one era
+        w_eras = self._count_player_eras(self.w_player)
+        b_eras = self._count_player_eras(self.b_player)
         
-        while True:
-            play_again = input("Would you like to play again? (yes/no): ").lower()
-            if play_again == "yes":
-                self.reset_game()
-                self.run()
-                break
-            elif play_again == "no":
-                break
-            else:
-                print("Please enter 'yes' or 'no'")
+        if w_eras <= 1:
+            self.state = GameState.BLACK_WON
+            self._display_eras()
+            print("black has won")
+            return
+            
+        if b_eras <= 1:
+            self.state = GameState.WHITE_WON
+            self._display_eras()
+            print("white has won")
+            return
     
     def reset_game(self):
         """Reset the game to initial state."""
+        # Store current settings
+        white_type = "heuristic" if isinstance(self.w_player, HeuristicAIPlayer) else "random" if isinstance(self.w_player, RandomAIPlayer) else "human"
+        black_type = "heuristic" if isinstance(self.b_player, HeuristicAIPlayer) else "random" if isinstance(self.b_player, RandomAIPlayer) else "human"
+        undo_redo = "on" if self.undo_redo else "off"
+        score = "on" if self.score else "off"
+        
+        # Reinitialize everything
         self.board = Board()
+        self.board.score = score.lower() == "on"
+        
+        # Recreate players
+        self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
+        self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
+        
+        # Reset board references
+        self.board.w_player = self.w_player
+        self.board.b_player = self.b_player
+        self.board.current_player = self.w_player
+        
+        # Reset game state
         self.current_player = self.w_player
         self.move_history = MoveHistory()
         self.state = GameState.PLAYING
         self.turn_number = 1
+        
+        # Setup the board
+        self.board._setupBoard()
 
     # def _calculate_era_presence(self, player) -> int:
     #     """Calculate number of eras where player has pieces."""
@@ -280,6 +284,14 @@ class Game:
             return GameState.WHITE_WON
         # If both have pieces, game continues
         return GameState.PLAYING
+
+    def _count_player_eras(self, player: 'PlayerStrategy') -> int:
+        """Count number of eras containing player's pieces"""
+        count = 0
+        for era in [self.board.past, self.board.present, self.board.future]:
+            if len(era.getPieces(player)) > 0:
+                count += 1
+        return count
 
 
 
