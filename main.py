@@ -5,8 +5,8 @@ import time
 from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
 from board import Board
-from movehistory import MoveHistory
 from player import PlayerFactory, HumanPlayer, HeuristicAIPlayer, RandomAIPlayer
+from movehistory import Originator, Caretaker, Memento
 
 from enum import Enum
 from typing import Optional, Dict, Callable
@@ -22,28 +22,39 @@ class Game:
     
     def __init__(self, white_type="human", black_type="human", undo_redo="off", score="off"):
         """Initialize the game with specified player types and settings."""
-    
-        self.board = Board()
-        self.board.score = score.lower() == "on"
         
-        self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
-        self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
-        
-        self.board.w_player = self.w_player
-        self.board.b_player = self.b_player
-        self.board.current_player = self.w_player
-        self.board._setupBoard()
-        # Initialize game components
-        
-        self.current_player = self.w_player
-        self.move_history = MoveHistory()
-        
-        # Game settings
+        # Game settings (initialize these first)
         self.undo_redo = undo_redo.lower() == "on"
         self.score = score.lower() == "on"
         self.state = GameState.PLAYING
         self.turn_number = 1
         
+        # Board initialization
+        self.board = Board()
+        self.board.score = self.score
+        
+        # Player initialization
+        self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
+        self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
+        
+        # Set board references
+        self.board.w_player = self.w_player
+        self.board.b_player = self.b_player
+        self.board.current_player = self.w_player
+        self.board._setupBoard()
+        
+        # Initialize current player
+        self.current_player = self.w_player
+        
+        # Initialize undo/redo functionality
+        if self.undo_redo:
+            self.originator = Originator(self)
+            self.caretaker = Caretaker(self.originator)
+            self.caretaker.save()
+        
+        # Add a flag to control board display
+        self.should_display_board = True
+    
     def _display_eras(self):
         """Display the current state of all eras."""
         print("---------------------------------")
@@ -100,62 +111,106 @@ class Game:
             row_str += f"{symbol}|"
         return row_str
     
-    def run(self):
-        """Run the game loop"""
-        while True:  # Outer loop for multiple games
+    def undo_redo_decorator(func):
+        """Decorator to handle undo/redo functionality"""
+        def wrapper(self, *args, **kwargs):
             while self.state == GameState.PLAYING:
-                self._display_eras()
+                if self.should_display_board:
+                    self._display_eras()
+                    if self.score:
+                        self._display_scores(self.w_player, "white")
+                        self._display_scores(self.b_player, "black")
                 
-                # Display scores if enabled and at least one player is human
-                if self.score and (isinstance(self.current_player, HumanPlayer) or 
-                                 isinstance(self.b_player if self.current_player == self.w_player else self.w_player, HumanPlayer)):
-                    # Always display white's score first
-                    self._display_scores(self.w_player, "white")
-                    self._display_scores(self.b_player, "black")
-                
-                # Handle undo/redo if enabled
-                if self.undo_redo:
-                    choice = self._handle_undo_redo()
-                    if choice != "next":
+                if hasattr(self, 'originator'):
+                    action = input("undo, redo, or next\n").strip().lower()
+                    
+                    if action == "undo":
+                        result = self.caretaker.undo()
+                        if result is None:
+                            print("Cannot undo at first turn")
+                            continue
+                        self.board = result.board
+                        self.current_player = result.current_player
+                        self.turn_number = result.turn_number
+                        self.state = result.state
+                        self.w_player = result.w_player
+                        self.b_player = result.b_player
+                        
+                        # Make sure the current_era references are correct
+                        self.w_player.current_era = self.board.past if result.w_player.current_era == result.board.past else \
+                                                   self.board.present if result.w_player.current_era == result.board.present else \
+                                                   self.board.future
+                        
+                        self.b_player.current_era = self.board.past if result.b_player.current_era == result.board.past else \
+                                                   self.board.present if result.b_player.current_era == result.board.present else \
+                                                   self.board.future
+                        
+                        self.should_display_board = True
+                        continue
+                    elif action == "redo":
+                        result = self.caretaker.redo()
+                        if result is None:
+                            print("Cannot redo at latest turn")
+                            continue
+                        self.should_display_board = True
+                        continue
+                    elif action == "next":
+                        self.should_display_board = False
+                    else:
+                        print("Not a valid action")
+                        self.should_display_board = True
                         continue
                 
                 # Get and execute move
                 move = self.current_player.getMove(self.board)
-                if move:
-                    success = self.board.makeMove(move)
-                    if success:
-                        self.move_history.save_state(
-                            self.board,
-                            "w_player" if self.current_player == self.w_player else "b_player",
-                            self.turn_number
-                        )
-                        print(move)
-                        self._handle_game_end()
-                        self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
-                        self.turn_number += 1
+                if move and self.board.makeMove(move):
+                    print(move)
+                    self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                    self.turn_number += 1
+                    self.state = self.get_winner()
+                    
+                    # Save state after successful move
+                    if hasattr(self, 'originator'):
+                        self.caretaker.save()
+                
+                # Reset display flag for next iteration
+                self.should_display_board = True
             
-            # Game has ended, ask to play again
-            print("Play again? (yes/no)")
-            play_again = input().lower().strip()
-            if play_again != "yes":
-                break
+        return wrapper
+    
+    @undo_redo_decorator
+    def run(self):
+        """Main game loop"""
+        while self.state == GameState.PLAYING:
+            if self.should_display_board:
+                self._display_eras()
+                if self.score:
+                    self._display_scores(self.w_player, "white")
+                    self._display_scores(self.b_player, "black")
+                
+            # Get and execute move
+            move = self.current_player.getMove(self.board)
+            if move and self.board.makeMove(move):
+                print(move)
+                self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                self.turn_number += 1
+                self.state = self.get_winner()
+                
+                # Save state after successful move
+                if hasattr(self, 'originator'):
+                    self.caretaker.save()
             
-            self.reset_game()
+            # Reset display flag for next iteration
+            self.should_display_board = True
     
     def _handle_undo_redo(self) -> str:
         """Handle undo/redo functionality"""
         while True:
             choice = input("undo, redo, or next\n").lower().strip()
             if choice == "undo":
-                if self.move_history.undo(self):
-                    print("Undid last move")
-                else:
-                    continue
+                self.move_history.undo(self)
             elif choice == "redo":
-                if self.move_history.redo(self):
-                    print("Redid last move")
-                else:
-                    continue
+                self.move_history.redo(self)
             elif choice == "next":
                 return choice
             else:
@@ -202,7 +257,7 @@ class Game:
         
         # Reset game state
         self.current_player = self.w_player
-        self.move_history = MoveHistory()
+        self.move_history = Originator(self)
         self.state = GameState.PLAYING
         self.turn_number = 1
         

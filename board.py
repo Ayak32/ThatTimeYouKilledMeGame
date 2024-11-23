@@ -337,11 +337,14 @@ class Board:
             next_x = current_pos._x + dx
             next_y = current_pos._y + dy
             
-            # If next position is off board, remove last piece and return success
+            # If next position is off board, remove and deactivate last piece
             if not (0 <= next_x < 4 and 0 <= next_y < 4):
                 if pieces_to_push:
                     last_piece, last_pos = pieces_to_push[-1]
                     self.grid[last_pos._y][last_pos._x].clearPiece()
+                    # Get the player object based on piece owner
+                    player = board.w_player if last_piece.owner == "w_player" else board.b_player
+                    player.deactivate_piece(last_piece)
                 return True
             
             current_pos = Position(next_x, next_y, current_pos._era)
@@ -513,11 +516,14 @@ class Era:
             next_x = current_pos._x + dx
             next_y = current_pos._y + dy
             
-            # If next position is off board, remove last piece and return success
+            # If next position is off board, remove and deactivate last piece
             if not (0 <= next_x < 4 and 0 <= next_y < 4):
                 if pieces_to_push:
                     last_piece, last_pos = pieces_to_push[-1]
                     self.grid[last_pos._y][last_pos._x].clearPiece()
+                    # Get the player object based on piece owner
+                    player = board.w_player if last_piece.owner == "w_player" else board.b_player
+                    player.deactivate_piece(last_piece)
                 return True
             
             current_pos = Position(next_x, next_y, current_pos._era)

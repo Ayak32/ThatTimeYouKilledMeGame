@@ -80,10 +80,10 @@ class PlayerStrategy(ABC):
         return None
 
     def deactivate_piece(self, piece: Piece):
-        """Move a piece from active to supply"""
+        """Move a piece from active"""
         if piece in self._pieces:
             self._pieces.remove(piece)
-            self._supply.append(piece.name)
+            # self._supply.append(piece.name)
     
     @abstractmethod
     def getMove(self, board: Board) -> Move:

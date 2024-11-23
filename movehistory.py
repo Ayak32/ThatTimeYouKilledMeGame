@@ -1,52 +1,88 @@
 from position import Position
 from copy import deepcopy
+import copy
 
-class GameMemento:
-    """Stores a snapshot of the game state"""
-    def __init__(self, board_state, current_player, turn_number):
-        self.board_state = deepcopy(board_state)
-        self.current_player = current_player  # Store player type (w_player/b_player)
-        self.turn_number = turn_number
-
-class MoveHistory():
-    def __init__(self):
-        self.history = []  # List of GameMemento objects
-        self.current_index = -1  # Points to current state in history
+class Originator:
+    """Manages the game state that needs to be saved and restored"""
+    def __init__(self, game):
+        self._state = game
     
-    def save_state(self, board, current_player, turn_number):
-        """Save current game state"""
-        # If we're not at the end of history, truncate future states
-        if self.current_index < len(self.history) - 1:
-            self.history = self.history[:self.current_index + 1]
+    def save(self):
+        """Creates a memento containing a deep copy of current state"""
+        game_copy = type(self._state)()  # Create new game instance
+        game_copy.board = copy.deepcopy(self._state.board)
+        game_copy.current_player = copy.deepcopy(self._state.current_player)
+        game_copy.turn_number = self._state.turn_number
+        game_copy.state = self._state.state
+        game_copy.w_player = copy.deepcopy(self._state.w_player)
+        game_copy.b_player = copy.deepcopy(self._state.b_player)
         
-        # Create and save new memento
-        memento = GameMemento(board, current_player, turn_number)
-        self.history.append(memento)
-        self.current_index += 1
+        # Make sure the current_era references are preserved
+        game_copy.w_player.current_era = game_copy.board.past if self._state.w_player.current_era == self._state.board.past else \
+                                        game_copy.board.present if self._state.w_player.current_era == self._state.board.present else \
+                                        game_copy.board.future
+        
+        game_copy.b_player.current_era = game_copy.board.past if self._state.b_player.current_era == self._state.board.past else \
+                                        game_copy.board.present if self._state.b_player.current_era == self._state.board.present else \
+                                        game_copy.board.future
+        
+        return Memento(game_copy)
     
-    def undo(self, game):
-        """Restore previous game state"""
-        if self.current_index > 0:
-            self.current_index -= 1
-            memento = self.history[self.current_index]
-            self._restore_state(game, memento)
-            return True
-        return False
+    def record_move(self, game):
+        """Updates the current state"""
+        self._state = game
     
-    def redo(self, game):
-        """Restore next game state"""
-        if self.current_index < len(self.history) - 1:
-            self.current_index += 1
-            memento = self.history[self.current_index]
-            self._restore_state(game, memento)
-            return True
-        return False
+    def restore(self, memento):
+        """Restores state from a memento"""
+        restored_state = memento.get_state()
+        return restored_state
+
+class Memento:
+    """Stores and protects the game state"""
+    def __init__(self, state):
+        self._state = state
     
-    def _restore_state(self, game, memento):
-        """Helper method to restore game state from memento"""
-        game.board = deepcopy(memento.board_state)
-        game.current_player = game.w_player if memento.current_player == "w_player" else game.b_player
-        game.turn_number = memento.turn_number
+    def get_state(self):
+        return self._state
+
+class Caretaker:
+    """Manages the history of game states"""
+    def __init__(self, originator):
+        self._mementos = []
+        self._originator = originator
+        self._head = -1
+    
+    def save(self):
+        """Saves current state and updates history"""
+        # Truncate future states if we're not at the end
+        if self._head < len(self._mementos) - 1:
+            self._mementos = self._mementos[:self._head + 1]
+            
+        self._mementos.append(self._originator.save())
+        self._head += 1
+    
+    def undo(self):
+        """Restores previous state"""
+        if self._head <= 0:  # At first turn or invalid state
+            return None  # Indicate that undo is not possible
+        
+        self._head -= 1
+        return self._mementos[self._head].get_state()
+    
+    def redo(self):
+        """Restores next state"""
+        if self._head >= len(self._mementos) - 1:  # At latest turn or invalid state
+            return None  # Indicate that redo is not possible
+        
+        self._head += 1
+        return self._mementos[self._head].get_state()
+    
+    def next(self):
+        """Prepares for next move by ensuring we're at latest state"""
+        self._mementos = self._mementos[:self._head + 1]
+        memento = copy.deepcopy(self._mementos[-1])
+        self._originator.restore(memento)
+        return memento.get_state()
 
 
 
