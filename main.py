@@ -24,7 +24,6 @@ class Game:
         """Initialize the game with specified player types and settings."""
     
         self.board = Board()
-        self.board.game = self
         self.board.score = score.lower() == "on"
         
         self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
@@ -51,11 +50,11 @@ class Game:
         
         # Display black's focus indicator
         if self.b_player.current_era == self.board.future:
-            print(" " * 26 + "black")
+            print(" " * 26 + "black" + " " * 2)
         elif self.b_player.current_era == self.board.present:
-            print(" " * 14 + "black")
+            print(" " * 14 + "black" + " " * 2)
         else:
-            print(" " * 2 + "black")
+            print(" " * 2 + "black" + " " * 2)
         
         # Display all three eras side by side
         self._display_era_rows(self.board.past, self.board.present, self.board.future)
@@ -63,11 +62,11 @@ class Game:
 
         # Display white's focus indicator
         if self.w_player.current_era == self.board.future:
-            print(" " * 26 + "white")
+            print(" " * 26 + "white" + " " * 2)
         elif self.w_player.current_era == self.board.present:
-            print(" " * 14 + "white")
+            print(" " * 14 + "white" + " " * 2)
         else:
-            print(" " * 2 + "white")
+            print(" " * 2 + "white" + " " * 2)
         
             
         # Display turn information
@@ -246,7 +245,7 @@ class Game:
         pieces = len(player._pieces)
         supply = len(player._supply)
         
-        # Count pieces in focused era
+        # Count pieces in focused era (current era)
         pieces_in_focus = len(player.current_era.getPieces(player))
         
         # Use HeuristicAIPlayer's evaluation methods
@@ -254,75 +253,6 @@ class Game:
         centrality = HeuristicAIPlayer._evaluate_centrality(self.board, player)
         
         print(f"{color}'s score: {eras} eras, {advantage} advantage, {supply} supply, {centrality} centrality, {pieces_in_focus} in focus")
-
-
-
-
-
-# class Game():
-#     """Display a menu and respond to choices when run."""
-
-#     def __init__(self, white_type="human", black_type="human", undo_redo="off", score="off"):
-#         self.w_player = PlayerFactory(white_type, "white")
-#         self.b_player = PlayerFactory(black_type, "black")
-#         # self.players = [player_w, player_b]
-        
-#         self.board = Board()
-#         self.current_player = self.w_player
-#         self.move_history = MoveHistory()
-#         self.turn_number = 1
-
-        
-#         # self.white_type = white_type
-#         # self.black_type = black_type
-#         self.undo_redo = undo_redo
-#         self.score = score
-
-
-#     def display_eras(self):
-#         """Display the eras"""
-
-#         print("---------------------------------")
-#         # function to print the eras
-#         # turn & current player print(game.turn)
-
-#     def run(self):
-#         """Display the menu and respond to choices."""
-
-#         while True:
-#             self.display_menu()
-#             choice = input(">")
-#             action = self.choices.get(choice)
-#             if action:
-#                 action()
-#             else:
-#                 print("{0} is not a valid choice".format(choice))
-
-#     def play_turn(self):
-#         # Player selects a move based on current board state
-#         move = self.current_player.select_move(self.board)
-        
-#         # Validate and execute move
-#         if self.board.is_valid_move(move):
-#             # Save current state before move
-#             self.history.save_state(self.board)
-            
-#             # Execute move
-#             move.execute(self.board)
-            
-#             # Check for game end
-#             if self.check_game_end():
-#                 self.declare_winner()
-            
-#             # Switch players
-#             self.current_player = (self.white_player if self.current_player == self.black_player 
-#                                    else self.black_player)
-#             self.play_turn += 1
-    
-#     def reset_game(self):
-#         return
-        
-
 
 
 

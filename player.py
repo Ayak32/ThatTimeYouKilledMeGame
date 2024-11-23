@@ -318,94 +318,64 @@ class HumanPlayer(PlayerStrategy):
         while True:
             piece_id = input("Select a copy to move\n").strip().upper()
             
-            # First check if piece exists in any era
+            # 1. Check if piece exists on the board at all
             piece_found = False
-            for piece in self.current_era.getPieces(self):
-                if piece.id == piece_id:
-                    piece_found = True
+            for era in [board.past, board.present, board.future]:
+                for piece in era.getPieces(None):  # Get all pieces regardless of owner
+                    if piece.id == piece_id:
+                        piece_found = True
+                        # 2. Check if it's an opponent's piece
+                        if piece.owner != self._color:
+                            print("That is not your copy")
+                            break
+                        # 3. Check if piece is in inactive era
+                        if era != self.current_era:
+                            print("Cannot select a copy from an inactive era")
+                            break
+                        # If we get here, it's a valid piece in the active era
+                        return piece
+                if piece_found:
                     break
             
-            # If piece wasn't found in current era, check other eras
             if not piece_found:
-                for era in [board.past, board.present, board.future]:
-                    if era != self.current_era:
-                        for piece in era.getPieces(self):
-                            if piece.id == piece_id and piece.owner == self._color:
-                                print("Cannot select a copy from an inactive era")
-                                piece_found = True
-                                break
-                    if piece_found:
-                        break
-                
-                if not piece_found:
-                    print("Not a valid copy")
-                continue
-            
-            # Now check if the piece is in valid moves
-            selected_piece = None
-            for piece in valid_moves.keys():
-                if piece.id == piece_id:
-                    selected_piece = piece
-                    break
-            
-            if not selected_piece:
-                print("That copy cannot move")
-                continue
-            
-            # Check if piece can make moves of maximum length
-            max_move_length = max(len(move.directions) for moves in valid_moves.values() 
-                                for move in moves)
-            piece_max_length = max(len(move.directions) for move in valid_moves[selected_piece])
-            
-            if piece_max_length < max_move_length:
-                print("That copy cannot move")
-                continue
-                
-            return selected_piece
+                print("Not a valid copy")
 
     def _input_directions(self, board: 'Board', piece: 'Piece', max_directions: int):
         """Select valid move directions."""
         valid_directions = {'n', 's', 'e', 'w', 'f', 'b'}
         directions = []
         
-        # Get valid moves for this piece
-        valid_moves = board.get_moves_for_piece(piece)
-        
-        # If piece can only make shorter moves than others, it can't be used
-        if max(len(move.directions) for move in valid_moves) < max_directions:
-            print("That copy cannot move")
-            return None
-            
         # Get first direction
         while True:
-            direction = input("Select first direction to move ['n', 's', 'e', 'w', 'f', 'b']\n").strip().lower()
+            direction = input("Select the first direction to move ['n', 'e', 's', 'w', 'f', 'b']\n").strip().lower()
+            
+            # 4. Check if direction is valid
             if direction not in valid_directions:
                 print("Not a valid direction")
                 continue
-                
-            # Check if this is a valid first move
+            
+            # 5. Check if piece can move in that direction
             temp_move = Move(piece, [direction], None, None)
             if not board.is_valid_direction(temp_move):
-                print("Not a valid direction")
+                print(f"Cannot move {direction}")
                 continue
-                
+            
             directions.append(direction)
             break
-        
-        # If two moves are possible, get second direction
+
+        # Similar checks for second direction if needed
         if max_directions > 1:
             while True:
-                direction = input("Select second direction to move ['n', 's', 'e', 'w', 'f', 'b']\n").strip().lower()
+                direction = input("Select the second direction to move ['n', 'e', 's', 'w', 'f', 'b']\n").strip().lower()
                 if direction not in valid_directions:
                     print("Not a valid direction")
                     continue
-                    
-                # Check if complete move is valid
+                
                 temp_move = Move(piece, directions + [direction], None, None)
                 if not board.is_valid_move(temp_move):
-                    print("Invalid move")
+                    print(f"Cannot move {direction}")
                     continue
-                    
+                
                 directions.append(direction)
                 break
         
@@ -417,16 +387,16 @@ class HumanPlayer(PlayerStrategy):
         while True:
             era = input("Select the next era to focus on ['past', 'present', 'future']\n").strip().lower()
 
+            # 6. Check if era is valid
             if era not in valid_eras:
                 print("Not a valid era")
                 continue
 
-            # Get the actual Era object instead of using the string
-            next_era = getattr(board, era)  # This gets board.past, board.present, or board.future
+            next_era = getattr(board, era)
             
-            # Check if selected era is current era
+            # 7. Check if era is current era
             if next_era == self.current_era:
                 print("Cannot select the current era")
                 continue
 
-            return next_era  # Return the Era object instead of the string
+            return next_era
