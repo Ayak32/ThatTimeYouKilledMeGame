@@ -129,8 +129,8 @@ class Game:
                         if result is None:
                             print("Cannot undo at first turn")
                             continue
+                        # Update game state with the restored state
                         self.board = result.board
-                        self.current_player = result.current_player
                         self.turn_number = result.turn_number
                         self.state = result.state
                         self.w_player = result.w_player
@@ -145,6 +145,9 @@ class Game:
                                                    self.board.present if result.b_player.current_era == result.board.present else \
                                                    self.board.future
                         
+                        # Properly restore the current player reference
+                        self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                        
                         self.should_display_board = True
                         continue
                     elif action == "redo":
@@ -152,6 +155,25 @@ class Game:
                         if result is None:
                             print("Cannot redo at latest turn")
                             continue
+                        # Update game state with the restored state
+                        self.board = result.board
+                        self.turn_number = result.turn_number
+                        self.state = result.state
+                        self.w_player = result.w_player
+                        self.b_player = result.b_player
+                        
+                        # Make sure the current_era references are correct
+                        self.w_player.current_era = self.board.past if result.w_player.current_era == result.board.past else \
+                                                   self.board.present if result.w_player.current_era == result.board.present else \
+                                                   self.board.future
+                        
+                        self.b_player.current_era = self.board.past if result.b_player.current_era == result.board.past else \
+                                                   self.board.present if result.b_player.current_era == result.board.present else \
+                                                   self.board.future
+                        
+                        # Properly restore the current player reference
+                        self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                        
                         self.should_display_board = True
                         continue
                     elif action == "next":
