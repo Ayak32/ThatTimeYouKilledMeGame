@@ -1,6 +1,7 @@
 import sys
 import pickle
 import time
+import copy
 
 from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
@@ -16,6 +17,7 @@ class GameState(Enum):
     WHITE_WON = "white_won"
     BLACK_WON = "black_won"
     DRAW = "draw"
+
 
 class Game:
     """Manages the game flow and user interactions."""
@@ -138,20 +140,27 @@ class Game:
                         self.board = result.board
                         self.turn_number = result.turn_number
                         self.state = result.state
-                        self.w_player = result.w_player
-                        self.b_player = result.b_player
                         
-                        # Restore the correct era references
-                        self.w_player.current_era = self.board.past if w_era.name == "past" else \
-                                                   self.board.present if w_era.name == "present" else \
+                        # Restore player states including supply and piece tracking
+                        # White player restoration
+                        self.w_player._supply = copy.deepcopy(result.w_player._supply)
+                        self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
+                        self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
+                        self.w_player.current_era = self.board.past if w_era == result.board.past else \
+                                                   self.board.present if w_era == result.board.present else \
                                                    self.board.future
                         
-                        self.b_player.current_era = self.board.past if b_era.name == "past" else \
-                                                   self.board.present if b_era.name == "present" else \
+                        # Black player restoration
+                        self.b_player._supply = copy.deepcopy(result.b_player._supply)
+                        self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
+                        self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
+                        self.b_player.current_era = self.board.past if b_era == result.board.past else \
+                                                   self.board.present if b_era == result.board.present else \
                                                    self.board.future
                         
-                        # Properly restore the current player reference
+                        # Update current player reference
                         self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                        self.board.current_player = self.current_player
                         
                         self.should_display_board = True
                         continue
@@ -161,7 +170,7 @@ class Game:
                             print("Cannot redo at latest turn")
                             continue
                         
-                        # Store the era references and focus from the result
+                        # Store the era references from the result
                         w_era = result.w_player.current_era
                         b_era = result.b_player.current_era
                         
@@ -170,24 +179,26 @@ class Game:
                         self.turn_number = result.turn_number
                         self.state = result.state
                         
-                        # Restore era references and focus for white player
-                        if w_era.name == "past":
-                            self.w_player.current_era = self.board.past
-                        elif w_era.name == "present":
-                            self.w_player.current_era = self.board.present
-                        else:
-                            self.w_player.current_era = self.board.future
+                        # Restore player states including supply and piece tracking
+                        # White player restoration
+                        self.w_player._supply = copy.deepcopy(result.w_player._supply)
+                        self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
+                        self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
+                        self.w_player.current_era = self.board.past if w_era == result.board.past else \
+                                                   self.board.present if w_era == result.board.present else \
+                                                   self.board.future
                         
-                        # Restore era references and focus for black player
-                        if b_era.name == "past":
-                            self.b_player.current_era = self.board.past
-                        elif b_era.name == "present":
-                            self.b_player.current_era = self.board.present
-                        else:
-                            self.b_player.current_era = self.board.future
+                        # Black player restoration
+                        self.b_player._supply = copy.deepcopy(result.b_player._supply)
+                        self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
+                        self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
+                        self.b_player.current_era = self.board.past if b_era == result.board.past else \
+                                                   self.board.present if b_era == result.board.present else \
+                                                   self.board.future
                         
                         # Update current player reference
                         self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                        self.board.current_player = self.current_player
                         
                         self.should_display_board = True
                         continue
@@ -324,27 +335,45 @@ class Game:
         """Count number of eras containing player's pieces"""
         count = 0
         for era in [self.board.past, self.board.present, self.board.future]:
-            if len(era.getPieces(player)) > 0:
+            # Only count pieces that belong to this player
+            player_pieces = [p for p in era.getPieces(player) 
+                            if p.owner == player._color 
+                            and p not in player._deactivated_pieces]
+            if len(player_pieces) > 0:
                 count += 1
         return count
 
     def _display_scores(self, player, color: str):
         """Display scores for a player"""
-        # Count eras with pieces
+        # Count number of eras with pieces
         eras = self._count_player_eras(player)
         
-        # Count active pieces and supply
+        # Count active pieces
         pieces = len(player._pieces)
-        supply = len(player._supply)
+        
+        # Determine valid supply piece IDs based on player color
+        valid_ids = ("4","5","6","7") if player._color == "b_player" else ("D","E","F","G")
+        
+        # Calculate available supply pieces (not activated or deactivated)
+        available_supply = [p for p in player._supply 
+                           if p.id in valid_ids 
+                           and p not in player._activated_pieces
+                           and p not in player._deactivated_pieces]
+        supply = len(available_supply)
         
         # Count pieces in focused era (current era)
-        pieces_in_focus = len(player.current_era.getPieces(player))
+        pieces_in_focus = len([p for p in player.current_era.getPieces(player)
+                              if p.owner == player._color])  # Verify ownership
         
-        # Use HeuristicAIPlayer's evaluation methods
+        # Calculate advantage using HeuristicAIPlayer's evaluation
         advantage = HeuristicAIPlayer._evaluate_piece_advantage(self.board, player)
+        
+        # Calculate centrality
         centrality = HeuristicAIPlayer._evaluate_centrality(self.board, player)
         
-        print(f"{color}'s score: {eras} eras, {advantage} advantage, {supply} supply, {centrality} centrality, {pieces_in_focus} in focus")
+        # Display the scores
+        print(f"{color}'s score: {eras} eras, {advantage} advantage, {supply} supply, "
+              f"{centrality} centrality, {pieces_in_focus} in focus")
 
 
 
@@ -392,4 +421,5 @@ if __name__ == "__main__":
         Game(white_type=white_type, black_type=black_type, undo_redo=undo_redo, score=score).run()
     except ValueError as error:
         print(f"Error: {error}")
+
 
