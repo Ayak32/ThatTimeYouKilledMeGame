@@ -129,6 +129,11 @@ class Game:
                         if result is None:
                             print("Cannot undo at first turn")
                             continue
+                        
+                        # Store the era references from the result
+                        w_era = result.w_player.current_era
+                        b_era = result.b_player.current_era
+                        
                         # Update game state with the restored state
                         self.board = result.board
                         self.turn_number = result.turn_number
@@ -136,13 +141,13 @@ class Game:
                         self.w_player = result.w_player
                         self.b_player = result.b_player
                         
-                        # Make sure the current_era references are correct
-                        self.w_player.current_era = self.board.past if result.w_player.current_era == result.board.past else \
-                                                   self.board.present if result.w_player.current_era == result.board.present else \
+                        # Restore the correct era references
+                        self.w_player.current_era = self.board.past if w_era.name == "past" else \
+                                                   self.board.present if w_era.name == "present" else \
                                                    self.board.future
                         
-                        self.b_player.current_era = self.board.past if result.b_player.current_era == result.board.past else \
-                                                   self.board.present if result.b_player.current_era == result.board.present else \
+                        self.b_player.current_era = self.board.past if b_era.name == "past" else \
+                                                   self.board.present if b_era.name == "present" else \
                                                    self.board.future
                         
                         # Properly restore the current player reference
@@ -155,23 +160,33 @@ class Game:
                         if result is None:
                             print("Cannot redo at latest turn")
                             continue
+                        
+                        # Store the era references and focus from the result
+                        w_era = result.w_player.current_era
+                        b_era = result.b_player.current_era
+                        
                         # Update game state with the restored state
                         self.board = result.board
                         self.turn_number = result.turn_number
                         self.state = result.state
-                        self.w_player = result.w_player
-                        self.b_player = result.b_player
                         
-                        # Make sure the current_era references are correct
-                        self.w_player.current_era = self.board.past if result.w_player.current_era == result.board.past else \
-                                                   self.board.present if result.w_player.current_era == result.board.present else \
-                                                   self.board.future
+                        # Restore era references and focus for white player
+                        if w_era.name == "past":
+                            self.w_player.current_era = self.board.past
+                        elif w_era.name == "present":
+                            self.w_player.current_era = self.board.present
+                        else:
+                            self.w_player.current_era = self.board.future
                         
-                        self.b_player.current_era = self.board.past if result.b_player.current_era == result.board.past else \
-                                                   self.board.present if result.b_player.current_era == result.board.present else \
-                                                   self.board.future
+                        # Restore era references and focus for black player
+                        if b_era.name == "past":
+                            self.b_player.current_era = self.board.past
+                        elif b_era.name == "present":
+                            self.b_player.current_era = self.board.present
+                        else:
+                            self.b_player.current_era = self.board.future
                         
-                        # Properly restore the current player reference
+                        # Update current player reference
                         self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
                         
                         self.should_display_board = True
