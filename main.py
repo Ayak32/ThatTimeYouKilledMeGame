@@ -355,7 +355,7 @@ class Game:
         valid_ids = ("4","5","6","7") if player._color == "b_player" else ("D","E","F","G")
         
         # Calculate available supply pieces (not activated or deactivated)
-        available_supply = [p for p in player._supply 
+        available_supply = [p for p in player._supply
                            if p.id in valid_ids 
                            and p not in player._activated_pieces
                            and p not in player._deactivated_pieces]

@@ -98,61 +98,130 @@ class HeuristicAIPlayer(PlayerStrategy):
         """Get the best move based on heuristic evaluation"""
         valid_moves = board.getValidMoves(self)
         
-        # Calculate and display current scores for both players
-        # Only display if both players are AI
-        if board.score and (isinstance(board.w_player, (HeuristicAIPlayer, RandomAIPlayer)) and 
-                          isinstance(board.b_player, (HeuristicAIPlayer, RandomAIPlayer))):
-            # Always display white's score first
-            board.game._display_scores(board.w_player, "white")
-            board.game._display_scores(board.b_player, "black")
+        # Display current scores if score display is enabled
+        if board.score:
+            self._display_scores(board)
         
-        # If no valid moves, just change era
+        # If no valid moves in current era, find an era where we CAN make moves
         if not valid_moves:
-            next_era = self._get_best_era(board)
+            # First, try to find eras where we have pieces AND can make moves
+            best_era = None
+            best_era_score = float('-inf')
+            
+            for era in [board.past, board.present, board.future]:
+                if era != self.current_era:
+                    # Temporarily switch era to check for valid moves
+                    original_era = self.current_era
+                    self.current_era = era
+                    possible_moves = board.getValidMoves(self)
+                    self.current_era = original_era
+                    
+                    if possible_moves:  # If we can make moves in this era
+                        # Score this era based on our heuristics
+                        era_score = (
+                            3 * len(era.getPieces(self)) +  # Prefer eras with more of our pieces
+                            2 * (len(era.getPieces(self)) - len(era.getPieces(board.b_player if self == board.w_player else board.w_player))) +  # Piece advantage
+                            1 * (2 if era == board.present else 1)  # Slight preference for present era
+                        )
+                        
+                        if era_score > best_era_score:
+                            best_era_score = era_score
+                            best_era = era
+            
+            # If we found an era where we can make moves, go there
+            if best_era:
+                return Move(None, [], best_era, self._color)
+            
+            # If we can't make moves anywhere, choose based on piece presence
+            eras_with_pieces = [era for era in [board.past, board.present, board.future]
+                               if era != self.current_era and len(era.getPieces(self)) > 0]
+            
+            if eras_with_pieces:
+                next_era = max(eras_with_pieces, key=lambda era: len(era.getPieces(self)))
+            else:
+                # If no pieces in other eras, choose present era
+                next_era = board.present if self.current_era != board.present else board.past
+            
             return Move(None, [], next_era, self._color)
         
-        # Find best move using heuristic
+        # We have valid moves, evaluate each one
         best_move = None
         best_score = float('-inf')
         
         for move in valid_moves:
             # Ensure move has a next era selected
             if move.next_era is None:
-                move.next_era = self._get_best_era(board)
+                # Temporarily try each possible next era to find the best one
+                best_next_era = None
+                best_next_score = float('-inf')
+                
+                for possible_era in [board.past, board.present, board.future]:
+                    if possible_era != self.current_era:
+                        move.next_era = possible_era
+                        # Simulate move
+                        original_pos = move.piece.position if move.piece else None
+                        success = move.execute(board)
+                        
+                        if success:
+                            next_score = (
+                                3 * self._evaluate_era_presence(board) +
+                                2 * self._evaluate_piece_advantage(board, self) +
+                                1 * len(self._supply) +
+                                1 * self._evaluate_centrality(board, self) +
+                                1 * self._evaluate_focus(board, possible_era)
+                            )
+                            
+                            # Undo move simulation
+                            self._undo_move(board, move, original_pos)
+                            
+                            if next_score > best_next_score:
+                                best_next_score = next_score
+                                best_next_era = possible_era
+                
+                move.next_era = best_next_era
             
-            # Simulate the move
+            # Now evaluate the complete move
             original_pos = move.piece.position if move.piece else None
             success = move.execute(board)
             
             if success:
-                # Check if this is a winning move
-                opponent = board.b_player if self._color == "w_player" else board.w_player
-                if self._evaluate_era_presence(board) <= 1:
+                era_presence = self._evaluate_era_presence(board)
+                
+                # Check for winning move
+                if self._count_opponent_eras(board) <= 1:
                     score = 9999
                 else:
-                    # Calculate weighted sum
-                    score = (3 * self._evaluate_era_presence(board) + 
-                            2 * HeuristicAIPlayer._evaluate_piece_advantage(board, self) + 
-                            1 * len(self._supply) + 
-                            1 * HeuristicAIPlayer._evaluate_centrality(board, self) + 
-                            1 * self._evaluate_focus(board, move.next_era))
+                    score = (
+                        3 * era_presence +
+                        2 * self._evaluate_piece_advantage(board, self) +
+                        1 * len(self._supply) +
+                        1 * self._evaluate_centrality(board, self) +
+                        1 * self._evaluate_focus(board, move.next_era)
+                    )
                 
-                # Undo the move simulation
+                # Undo move simulation
                 self._undo_move(board, move, original_pos)
                 
-                # Update best move if this score is higher
+                # Update best move if score is higher
                 if score > best_score:
                     best_score = score
                     best_move = move
                 elif score == best_score and random.random() < 0.5:
-                    # Randomly break ties
                     best_move = move
         
-        # Ensure the best move has a next era selected
-        if best_move and best_move.next_era is None:
-            best_move.next_era = self._get_best_era(board)
-            
         return best_move
+
+    def _display_scores(self, board):
+        """Display unweighted scores for both players"""
+        for player, color in [(board.w_player, "white"), (board.b_player, "black")]:
+            era_presence = self._evaluate_era_presence(board)
+            piece_advantage = self._evaluate_piece_advantage(board, player)
+            supply = len(player._supply)
+            centrality = self._evaluate_centrality(board, player)
+            focus = self._evaluate_focus(board, player.current_era)
+            
+            print(f"{color}'s score: {era_presence} eras, {piece_advantage} advantage, "
+                  f"{supply} supply, {centrality} centrality, {focus} in focus")
 
     def _count_eras_with_pieces(self, board: 'Board', player: 'PlayerStrategy') -> int:
         """Count number of eras containing player's pieces"""
@@ -242,6 +311,15 @@ class HeuristicAIPlayer(PlayerStrategy):
             
             original_era = original_pos._era
             original_era.grid[original_pos._y][original_pos._x].setPiece(move.piece)
+
+    def _count_opponent_eras(self, board):
+        """Count number of eras containing opponent's pieces"""
+        opponent = board.b_player if self == board.w_player else board.w_player
+        count = 0
+        for era in [board.past, board.present, board.future]:
+            if len(era.getPieces(opponent)) > 0:
+                count += 1
+        return count
 
 class RandomAIPlayer(PlayerStrategy):
     def getMove(self, board: 'Board') -> Move:
