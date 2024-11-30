@@ -99,8 +99,8 @@ class HeuristicAIPlayer(PlayerStrategy):
         valid_moves = board.getValidMoves(self)
         
         # Display current scores if score display is enabled
-        if board.score:
-            self._display_scores(board)
+        # if board.score:
+        #     self._display_scores(board)
         
         # If no valid moves in current era, find an era where we CAN make moves
         if not valid_moves:
