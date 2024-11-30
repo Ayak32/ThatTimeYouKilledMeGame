@@ -71,23 +71,25 @@ class PlayerStrategy(ABC):
  
 
     def activate_piece(self, piece_id: str):
-        """Move a piece from supply to active pieces"""
+        """Activate a piece from supply"""
         for piece in self._supply:
             if piece.id == piece_id:
                 self._supply.remove(piece)
-                self._pieces.append(piece)
-                self._activated_pieces.append(piece)
+                if piece not in self._pieces:
+                    self._pieces.append(piece)
+                if piece not in self._activated_pieces:
+                    self._activated_pieces.append(piece)
                 return piece
         return None
 
-    def deactivate_piece(self, piece: Piece):
-        """Move a piece back to supply"""
+    def deactivate_piece(self, piece: 'Piece'):
+        """Deactivate a piece that was removed from play"""
         if piece in self._pieces:
             self._pieces.remove(piece)
-            self._supply.append(piece)
-            if piece in self._activated_pieces:
-                self._activated_pieces.remove(piece)
+        if piece not in self._deactivated_pieces:
             self._deactivated_pieces.append(piece)
+        if piece in self._activated_pieces:
+            self._activated_pieces.remove(piece)
     
     @abstractmethod
     def getMove(self, board: Board) -> Move:
