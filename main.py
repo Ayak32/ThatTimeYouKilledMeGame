@@ -116,6 +116,129 @@ class Game:
     def undo_redo_decorator(func):
         """Decorator to handle undo/redo functionality"""
         def wrapper(self, *args, **kwargs):
+            while True:
+                while self.state == GameState.PLAYING:
+                    if self.should_display_board:
+                        self._display_eras()
+                        if self.score:
+                            self._display_scores(self.w_player, "white")
+                            self._display_scores(self.b_player, "black")
+                    
+                    if hasattr(self, 'originator'):
+                        action = input("undo, redo, or next\n").strip().lower()
+                        
+                        if action == "undo":
+                            result = self.caretaker.undo()
+                            if result is None:
+                                print("Cannot undo at first turn")
+                                continue
+                            
+                            # Store the era references from the result
+                            w_era = result.w_player.current_era
+                            b_era = result.b_player.current_era
+                            
+                            # Update game state with the restored state
+                            self.board = result.board
+                            self.turn_number = result.turn_number
+                            self.state = result.state
+                            
+                            # Restore player states including supply and piece tracking
+                            # White player restoration
+                            self.w_player._supply = copy.deepcopy(result.w_player._supply)
+                            self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
+                            self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
+                            self.w_player.current_era = self.board.past if w_era == result.board.past else \
+                                                    self.board.present if w_era == result.board.present else \
+                                                    self.board.future
+                            
+                            # Black player restoration
+                            self.b_player._supply = copy.deepcopy(result.b_player._supply)
+                            self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
+                            self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
+                            self.b_player.current_era = self.board.past if b_era == result.board.past else \
+                                                    self.board.present if b_era == result.board.present else \
+                                                    self.board.future
+                            
+                            # Update current player reference
+                            self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                            self.board.current_player = self.current_player
+                            
+                            self.should_display_board = True
+                            continue
+                        elif action == "redo":
+                            result = self.caretaker.redo()
+                            if result is None:
+                                print("Cannot redo at latest turn")
+                                continue
+                            
+                            # Store the era references from the result
+                            w_era = result.w_player.current_era
+                            b_era = result.b_player.current_era
+                            
+                            # Update game state with the restored state
+                            self.board = result.board
+                            self.turn_number = result.turn_number
+                            self.state = result.state
+                            
+                            # Restore player states including supply and piece tracking
+                            # White player restoration
+                            self.w_player._supply = copy.deepcopy(result.w_player._supply)
+                            self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
+                            self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
+                            self.w_player.current_era = self.board.past if w_era == result.board.past else \
+                                                    self.board.present if w_era == result.board.present else \
+                                                    self.board.future
+                            
+                            # Black player restoration
+                            self.b_player._supply = copy.deepcopy(result.b_player._supply)
+                            self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
+                            self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
+                            self.b_player.current_era = self.board.past if b_era == result.board.past else \
+                                                    self.board.present if b_era == result.board.present else \
+                                                    self.board.future
+                            
+                            # Update current player reference
+                            self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
+                            self.board.current_player = self.current_player
+                            
+                            self.should_display_board = True
+                            continue
+                        elif action == "next":
+                            self.should_display_board = False
+                        else:
+                            print("Not a valid action")
+                            self.should_display_board = True
+                            continue
+                    
+                    
+                    # Get and execute move
+                    move = self.current_player.getMove(self.board)
+                    if move and self.board.makeMove(move):
+                        print(move)
+                        self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
+                        self.turn_number += 1
+                        
+                        self.state = self.get_winner()
+                        
+                        # Save state after successful move
+                        if hasattr(self, 'originator'):
+                            self.caretaker.save()
+                    
+                    # Reset display flag for next iteration
+                    self.should_display_board = True
+                print("play again?")
+                play_again = input().lower().strip()
+                if play_again != "yes":
+                    break
+                    
+                # Reset the game for a new round
+                self.reset_game()
+        return wrapper
+    
+    @undo_redo_decorator
+    def run(self):
+        """Main game loop"""
+        while True:  # Outer loop for multiple games
             while self.state == GameState.PLAYING:
                 if self.should_display_board:
                     self._display_eras()
@@ -123,101 +246,24 @@ class Game:
                         self._display_scores(self.w_player, "white")
                         self._display_scores(self.b_player, "black")
                 
-                if hasattr(self, 'originator'):
-                    action = input("undo, redo, or next\n").strip().lower()
-                    
-                    if action == "undo":
-                        result = self.caretaker.undo()
-                        if result is None:
-                            print("Cannot undo at first turn")
-                            continue
-                        
-                        # Store the era references from the result
-                        w_era = result.w_player.current_era
-                        b_era = result.b_player.current_era
-                        
-                        # Update game state with the restored state
-                        self.board = result.board
-                        self.turn_number = result.turn_number
-                        self.state = result.state
-                        
-                        # Restore player states including supply and piece tracking
-                        # White player restoration
-                        self.w_player._supply = copy.deepcopy(result.w_player._supply)
-                        self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
-                        self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
-                        self.w_player.current_era = self.board.past if w_era == result.board.past else \
-                                                   self.board.present if w_era == result.board.present else \
-                                                   self.board.future
-                        
-                        # Black player restoration
-                        self.b_player._supply = copy.deepcopy(result.b_player._supply)
-                        self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
-                        self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
-                        self.b_player.current_era = self.board.past if b_era == result.board.past else \
-                                                   self.board.present if b_era == result.board.present else \
-                                                   self.board.future
-                        
-                        # Update current player reference
-                        self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
-                        self.board.current_player = self.current_player
-                        
-                        self.should_display_board = True
-                        continue
-                    elif action == "redo":
-                        result = self.caretaker.redo()
-                        if result is None:
-                            print("Cannot redo at latest turn")
-                            continue
-                        
-                        # Store the era references from the result
-                        w_era = result.w_player.current_era
-                        b_era = result.b_player.current_era
-                        
-                        # Update game state with the restored state
-                        self.board = result.board
-                        self.turn_number = result.turn_number
-                        self.state = result.state
-                        
-                        # Restore player states including supply and piece tracking
-                        # White player restoration
-                        self.w_player._supply = copy.deepcopy(result.w_player._supply)
-                        self.w_player._pieces = copy.deepcopy(result.w_player._pieces)
-                        self.w_player._activated_pieces = copy.deepcopy(result.w_player._activated_pieces)
-                        self.w_player.current_era = self.board.past if w_era == result.board.past else \
-                                                   self.board.present if w_era == result.board.present else \
-                                                   self.board.future
-                        
-                        # Black player restoration
-                        self.b_player._supply = copy.deepcopy(result.b_player._supply)
-                        self.b_player._pieces = copy.deepcopy(result.b_player._pieces)
-                        self.b_player._activated_pieces = copy.deepcopy(result.b_player._activated_pieces)
-                        self.b_player.current_era = self.board.past if b_era == result.board.past else \
-                                                   self.board.present if b_era == result.board.present else \
-                                                   self.board.future
-                        
-                        # Update current player reference
-                        self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
-                        self.board.current_player = self.current_player
-                        
-                        self.should_display_board = True
-                        continue
-                    elif action == "next":
-                        self.should_display_board = False
-                    else:
-                        print("Not a valid action")
-                        self.should_display_board = True
-                        continue
                 
-                self.state = self.get_winner()
+                # if game_state != GameState.PLAYING:
+                #     print(f"Game Over! {game_state.value}")
+                #     # Always prompt for play again, regardless of player types
+                #     play_again = input("play again? (yes/no): ").strip().lower()
+                #     if play_again == "yes":
+                #         self.reset_game()
+                #         continue  # Start new game
+                #     else:
+                #         break  # End program
+                
                 # Get and execute move
                 move = self.current_player.getMove(self.board)
                 if move and self.board.makeMove(move):
                     print(move)
                     self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                     self.turn_number += 1
-                    
-                    
+                    game_state = self.get_winner()
                     # Save state after successful move
                     if hasattr(self, 'originator'):
                         self.caretaker.save()
@@ -225,90 +271,33 @@ class Game:
                 # Reset display flag for next iteration
                 self.should_display_board = True
             
-        return wrapper
-    
-    @undo_redo_decorator
-    def run(self):
-        """Main game loop"""
-        while self.state == GameState.PLAYING:
-            if self.should_display_board:
-                self._display_eras()
-                if self.score:
-                    self._display_scores(self.w_player, "white")
-                    self._display_scores(self.b_player, "black")
-            
-            game_state = self.get_winner()
-            # Get and execute move
-            move = self.current_player.getMove(self.board)
-            if move and self.board.makeMove(move):
-                print(move)
-                self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
-                self.turn_number += 1
-                # self.state = self.get_winner()
-                
-                
-                # Save state after successful move
-                if hasattr(self, 'originator'):
-                    self.caretaker.save()
-            
-            # Reset display flag for next iteration
-            self.should_display_board = True
-        # print("play again?")
-        # play_again = input().lower().strip()
-        # if play_again != "yes":
-        #     return
-            
-        # # Reset the game for a new round
-        # self.reset_game() 
 
-    # def _handle_undo_redo(self) -> str:
-    #     """Handle undo/redo functionality"""
-    #     while True:
-    #         choice = input("undo, redo, or next\n").lower().strip()
-    #         if choice == "undo":
-    #             self.move_history.undo(self)
-    #         elif choice == "redo":
-    #             self.move_history.redo(self)
-    #         elif choice == "next":
-    #             return choice
-    #         else:
-    #             continue
-    
-    # def _handle_game_end(self):
-    #     """Check if the game has ended and update state accordingly"""
-    #     # Check if either player has pieces in only one era
-    #     w_eras = self._count_player_eras(self.w_player)
-    #     b_eras = self._count_player_eras(self.b_player)
-        
-    #     if w_eras <= 1:
-    #         self.state = GameState.BLACK_WON
-    #         self._display_eras()
-    #         print("black has won")
-    #         return
-            
-    #     if b_eras <= 1:
-    #         self.state = GameState.WHITE_WON
-    #         self._display_eras()
-    #         print("white has won")
-    #         return
+            print("play again?")
+            play_again = input().lower().strip()
+            if play_again != "yes":
+                break
+                
+            # Reset the game for a new round
+            self.reset_game()
+
     
     def reset_game(self):
-        """Reset the game to initial state."""
-        # Store current settings
-        play_again = input("play again?\n").strip().lower()
-        if play_again != "yes":
-            return
-
-        white_type = "heuristic" if isinstance(self.w_player, HeuristicAIPlayer) else "random" if isinstance(self.w_player, RandomAIPlayer) else "human"
-        black_type = "heuristic" if isinstance(self.b_player, HeuristicAIPlayer) else "random" if isinstance(self.b_player, RandomAIPlayer) else "human"
-        undo_redo = "on" if self.undo_redo else "off"
-        score = "on" if self.score else "off"
+        """Reset the game to initial state"""
+        # Store current settings before reset
+        white_type = "heuristic" if isinstance(self.w_player, HeuristicAIPlayer) else \
+                     "random" if isinstance(self.w_player, RandomAIPlayer) else "human"
+        black_type = "heuristic" if isinstance(self.b_player, HeuristicAIPlayer) else \
+                     "random" if isinstance(self.b_player, RandomAIPlayer) else "human"
         
-        # Reinitialize everything
+        # Reset turn counter and state
+        self.turn_number = 1
+        self.state = GameState.PLAYING
+        
+        # Reset board
         self.board = Board()
-        self.board.score = score.lower() == "on"
+        self.board.score = self.score  # Preserve score display setting
         
-        # Recreate players
+        # Recreate players with same types as before
         self.w_player = PlayerFactory.create_player(white_type, "w_player", self.board)
         self.b_player = PlayerFactory.create_player(black_type, "b_player", self.board)
         
@@ -317,15 +306,21 @@ class Game:
         self.board.b_player = self.b_player
         self.board.current_player = self.w_player
         
-        # Reset game state
-        self.current_player = self.w_player
-        self.move_history = Originator(self)
-        self.state = GameState.PLAYING
-        self.turn_number = 1
-        
-        # Setup the board
+        # Setup initial board state
         self.board._setupBoard()
-
+        
+        # Reset to white's turn
+        self.current_player = self.w_player
+        
+        # Reset display flag
+        self.should_display_board = True
+        
+        # Reset undo/redo if enabled
+        if self.undo_redo:
+            self.originator = Originator(self)
+            self.caretaker = Caretaker(self.originator)
+            self.caretaker.save()
+    
     def get_winner(self) -> GameState:
         """Determine the winner of the game"""
         w_pieces = 0
@@ -339,12 +334,10 @@ class Game:
         # If white has no pieces, black wins
         if w_pieces <= 1:
             print("black has won")
-            self.reset_game()
             return GameState.BLACK_WON
         # If black has no pieces, white wins
         elif b_pieces <= 1:
             print("white has won")
-            self.reset_game()
             return GameState.WHITE_WON
         # If both have pieces, game continues
         return GameState.PLAYING
