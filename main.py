@@ -132,7 +132,6 @@ class Game:
                         if action == "undo":
                             result = self.caretaker.undo()
                             if result is None:
-                                print("Cannot undo at first turn")
                                 continue
                             
                             # Store the era references from the result
@@ -177,7 +176,6 @@ class Game:
                         elif action == "redo":
                             result = self.caretaker.redo()
                             if result is None:
-                                print("Cannot redo at latest turn")
                                 continue
                             
                             # Store the era references from the result
@@ -222,7 +220,6 @@ class Game:
                         elif action == "next":
                             self.should_display_board = False
                         else:
-                            print("Not a valid action")
                             self.should_display_board = True
                             continue
                     
