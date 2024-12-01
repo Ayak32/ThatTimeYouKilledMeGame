@@ -209,13 +209,14 @@ class Game:
                         self.should_display_board = True
                         continue
                 
+                self.state = self.get_winner()
                 # Get and execute move
                 move = self.current_player.getMove(self.board)
                 if move and self.board.makeMove(move):
                     print(move)
                     self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                     self.turn_number += 1
-                    self.state = self.get_winner()
+                    
                     
                     # Save state after successful move
                     if hasattr(self, 'originator'):
@@ -235,14 +236,16 @@ class Game:
                 if self.score:
                     self._display_scores(self.w_player, "white")
                     self._display_scores(self.b_player, "black")
-                
+            
+            game_state = self.get_winner()
             # Get and execute move
             move = self.current_player.getMove(self.board)
             if move and self.board.makeMove(move):
                 print(move)
                 self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                 self.turn_number += 1
-                self.state = self.get_winner()
+                # self.state = self.get_winner()
+                
                 
                 # Save state after successful move
                 if hasattr(self, 'originator'):
@@ -250,41 +253,52 @@ class Game:
             
             # Reset display flag for next iteration
             self.should_display_board = True
-    
-    def _handle_undo_redo(self) -> str:
-        """Handle undo/redo functionality"""
-        while True:
-            choice = input("undo, redo, or next\n").lower().strip()
-            if choice == "undo":
-                self.move_history.undo(self)
-            elif choice == "redo":
-                self.move_history.redo(self)
-            elif choice == "next":
-                return choice
-            else:
-                continue
-    
-    def _handle_game_end(self):
-        """Check if the game has ended and update state accordingly"""
-        # Check if either player has pieces in only one era
-        w_eras = self._count_player_eras(self.w_player)
-        b_eras = self._count_player_eras(self.b_player)
-        
-        if w_eras <= 1:
-            self.state = GameState.BLACK_WON
-            self._display_eras()
-            print("black has won")
-            return
+        # print("play again?")
+        # play_again = input().lower().strip()
+        # if play_again != "yes":
+        #     return
             
-        if b_eras <= 1:
-            self.state = GameState.WHITE_WON
-            self._display_eras()
-            print("white has won")
-            return
+        # # Reset the game for a new round
+        # self.reset_game() 
+
+    # def _handle_undo_redo(self) -> str:
+    #     """Handle undo/redo functionality"""
+    #     while True:
+    #         choice = input("undo, redo, or next\n").lower().strip()
+    #         if choice == "undo":
+    #             self.move_history.undo(self)
+    #         elif choice == "redo":
+    #             self.move_history.redo(self)
+    #         elif choice == "next":
+    #             return choice
+    #         else:
+    #             continue
+    
+    # def _handle_game_end(self):
+    #     """Check if the game has ended and update state accordingly"""
+    #     # Check if either player has pieces in only one era
+    #     w_eras = self._count_player_eras(self.w_player)
+    #     b_eras = self._count_player_eras(self.b_player)
+        
+    #     if w_eras <= 1:
+    #         self.state = GameState.BLACK_WON
+    #         self._display_eras()
+    #         print("black has won")
+    #         return
+            
+    #     if b_eras <= 1:
+    #         self.state = GameState.WHITE_WON
+    #         self._display_eras()
+    #         print("white has won")
+    #         return
     
     def reset_game(self):
         """Reset the game to initial state."""
         # Store current settings
+        play_again = input("play again?\n").strip().lower()
+        if play_again != "yes":
+            return
+
         white_type = "heuristic" if isinstance(self.w_player, HeuristicAIPlayer) else "random" if isinstance(self.w_player, RandomAIPlayer) else "human"
         black_type = "heuristic" if isinstance(self.b_player, HeuristicAIPlayer) else "random" if isinstance(self.b_player, RandomAIPlayer) else "human"
         undo_redo = "on" if self.undo_redo else "off"
@@ -323,10 +337,14 @@ class Game:
             b_pieces += len(era.getPieces(self.b_player))
         
         # If white has no pieces, black wins
-        if w_pieces == 0:
+        if w_pieces <= 1:
+            print("black has won")
+            self.reset_game()
             return GameState.BLACK_WON
         # If black has no pieces, white wins
-        elif b_pieces == 0:
+        elif b_pieces <= 1:
+            print("white has won")
+            self.reset_game()
             return GameState.WHITE_WON
         # If both have pieces, game continues
         return GameState.PLAYING
