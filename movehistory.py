@@ -49,10 +49,6 @@ class Originator:
         
         return Memento(game_copy)
     
-    def record_move(self, game):
-        """Updates the current state"""
-        self._state = game
-    
     def restore(self, memento):
         """Restores state from a memento"""
         restored_state = memento.get_state()
@@ -171,20 +167,6 @@ class Move:
             return None
         new_x, new_y, new_era = result
         return Position(new_x, new_y, new_era)
-
-    def _get_new_era(self, current_era: 'Era', direction: str, board: 'Board'):
-        """Get new era for temporal movement"""
-        if direction == 'f':
-            if current_era == board.past:
-                return board.present
-            elif current_era == board.present:
-                return board.future
-        elif direction == 'b':
-            if current_era == board.future:
-                return board.present
-            elif current_era == board.present:
-                return board.past
-        return None
 
     def __str__(self):
         """String representation of the move"""

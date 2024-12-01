@@ -42,11 +42,6 @@ class Board:
         # Execute the move
         return move.execute(self)
     
-    def undoMove(self, move: 'Move'):
-        """Undo a move on the board"""
-        # Implement move reversal
-        pass
-    
     def getValidMoves(self, player):
         """Get all valid moves for the current player"""
         valid_moves = []
