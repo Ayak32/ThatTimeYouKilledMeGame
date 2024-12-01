@@ -1,3 +1,5 @@
+from position import Position
+
 import sys
 import pickle
 import time
@@ -138,7 +140,7 @@ class Game:
                             b_era = result.b_player.current_era
                             
                             # Update game state with the restored state
-                            self.board = result.board
+                            self.board = copy.deepcopy(result.board)
                             self.turn_number = result.turn_number
                             self.state = result.state
                             
@@ -163,6 +165,13 @@ class Game:
                             self.current_player = self.w_player if result.current_player._color == "w_player" else self.b_player
                             self.board.current_player = self.current_player
                             
+                            # Fix piece positions on the board
+                            for era in [self.board.past, self.board.present, self.board.future]:
+                                for y in range(4):
+                                    for x in range(4):
+                                        if era.grid[y][x].isOccupied():
+                                            piece = era.grid[y][x].getPiece()
+                                            piece.position = Position(x, y, era)
                             self.should_display_board = True
                             continue
                         elif action == "redo":
@@ -176,7 +185,7 @@ class Game:
                             b_era = result.b_player.current_era
                             
                             # Update game state with the restored state
-                            self.board = result.board
+                            self.board = copy.deepcopy(result.board)
                             self.turn_number = result.turn_number
                             self.state = result.state
                             
@@ -202,6 +211,13 @@ class Game:
                             self.board.current_player = self.current_player
                             
                             self.should_display_board = True
+                            # Fix piece positions on the board
+                            for era in [self.board.past, self.board.present, self.board.future]:
+                                for y in range(4):
+                                    for x in range(4):
+                                        if era.grid[y][x].isOccupied():
+                                            piece = era.grid[y][x].getPiece()
+                                            piece.position = Position(x, y, era)
                             continue
                         elif action == "next":
                             self.should_display_board = False

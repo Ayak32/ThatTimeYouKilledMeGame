@@ -75,25 +75,26 @@ class Caretaker:
     
     def save(self):
         """Saves current state and updates history"""
-        # Truncate future states if we're not at the end
+        # Truncate any future states when saving after an undo
         if self._head < len(self._mementos) - 1:
             self._mementos = self._mementos[:self._head + 1]
-            
+        
+        # Save new state
         self._mementos.append(self._originator.save())
         self._head += 1
     
     def undo(self):
         """Restores previous state"""
-        if self._head <= 0:  # At first turn or invalid state
-            return None  # Indicate that undo is not possible
+        if self._head <= 0:
+            return None
         
         self._head -= 1
         return self._mementos[self._head].get_state()
     
     def redo(self):
         """Restores next state"""
-        if self._head >= len(self._mementos) - 1:  # At latest turn or invalid state
-            return None  # Indicate that redo is not possible
+        if self._head >= len(self._mementos) - 1:
+            return None
         
         self._head += 1
         return self._mementos[self._head].get_state()
