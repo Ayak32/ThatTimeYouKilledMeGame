@@ -1,10 +1,8 @@
 from position import Position
-
 import sys
 import pickle
 import time
 import copy
-
 from decimal import Decimal, setcontext, BasicContext
 from datetime import datetime
 from board import Board
@@ -259,17 +257,6 @@ class Game:
                         self._display_scores(self.w_player, "white")
                         self._display_scores(self.b_player, "black")
                 
-                
-                # if game_state != GameState.PLAYING:
-                #     print(f"Game Over! {game_state.value}")
-                #     # Always prompt for play again, regardless of player types
-                #     play_again = input("play again? (yes/no): ").strip().lower()
-                #     if play_again == "yes":
-                #         self.reset_game()
-                #         continue  # Start new game
-                #     else:
-                #         break  # End program
-                
                 # Get and execute move
                 move = self.current_player.getMove(self.board)
                 if move and self.board.makeMove(move):
@@ -402,7 +389,6 @@ class Game:
 
 
 def validate_and_get_args(argv):
-
     if len(argv) > 5:
         raise ValueError(f"Invalid number of arguments")
     

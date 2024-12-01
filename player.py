@@ -35,8 +35,6 @@ class PlayerFactory:
         return player_class(color, board)
     
 
-
-
 """ Strategy Pattern """
 
 class PlayerStrategy(ABC):
@@ -99,10 +97,7 @@ class HeuristicAIPlayer(PlayerStrategy):
     def getMove(self, board: 'Board') -> Move:
         """Get the best move based on heuristic evaluation"""
         valid_moves = board.getValidMoves(self)
-        
-        # Display current scores if score display is enabled
-        # if board.score:
-        #     self._display_scores(board)
+
         
         # If no valid moves in current era, find an era where we CAN make moves
         if not valid_moves:
