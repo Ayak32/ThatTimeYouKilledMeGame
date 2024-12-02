@@ -36,7 +36,7 @@ class Board:
     def makeMove(self, move) -> bool:
         """Execute a move on the board"""
         # First validate the move
-        if not self.is_valid_move(move):
+        if not self._is_valid_move(move):
             return False
             
         # Execute the move
@@ -50,7 +50,7 @@ class Board:
         return valid_moves
     
     # Helper function to calculate new position after a move
-    def get_new_position(self, x, y, direction, era=None):
+    def _get_new_position(self, x, y, direction, era=None):
         """Calculate new position after a move, returning None if invalid"""
         new_x = x
         new_y = y
@@ -65,7 +65,7 @@ class Board:
         elif direction == 'w':  # West: decrease x (move left)
             new_x -= 1
         elif direction in ['f', 'b']:
-            new_era = self.get_new_era(era, direction)
+            new_era = self._get_new_era(era, direction)
             if new_era is None:  # Invalid temporal movement
                 return None
         
@@ -76,7 +76,7 @@ class Board:
         return (new_x, new_y, new_era)
 
     # Helper function to get era after time travel
-    def get_new_era(self, era, direction):
+    def _get_new_era(self, era, direction):
         """Get new era after temporal movement, respecting temporal movement rules"""
         if direction == 'f':
             if era == self.future:  # Can't move forward from future
@@ -94,19 +94,6 @@ class Board:
                 return self.present
         return era
 
-    # Helper function to check if a position is valid
-    def is_valid_position(self,x, y):
-        return 0 <= x < 4 and 0 <= y < 4
-
-    # Helper function to check if a move would create a paradox
-    def creates_paradox(self, x, y, era, piece):
-        """Check if placing piece at (x,y) in era would create a paradox"""
-        space = era.grid[y][x]
-        if space.isOccupied():
-            occupied_piece = space.getPiece()
-            # Only a paradox if the piece belongs to the same player
-            return occupied_piece.owner == piece.owner
-        return False
 
     def get_moves_for_piece(self, piece: 'Piece') -> list:
         """Get all valid moves for a piece"""
@@ -114,25 +101,25 @@ class Board:
         valid_directions = ['n', 's', 'e', 'w', 'f', 'b']
         
         # First check if piece is surrounded by friendlies
-        if self.is_surrounded_by_friendlies(piece):
+        if self._is_surrounded_by_friendlies(piece):
             return []  # Return empty list if surrounded
             
         # Try single moves
         for direction in valid_directions:
             move = Move(piece, [direction], None, None)
-            if self.is_valid_direction(move):
+            if self._is_valid_direction(move):
                 valid_moves.append(move)
         
         # Try double moves
         for dir1 in valid_directions:
             for dir2 in valid_directions:
                 move = Move(piece, [dir1, dir2], None, None)
-                if self.is_valid_move(move):
+                if self._is_valid_move(move):
                     valid_moves.append(move)
         
         return valid_moves
 
-    def is_surrounded_by_friendlies(self, piece: 'Piece') -> bool:
+    def _is_surrounded_by_friendlies(self, piece: 'Piece') -> bool:
         """Check if a piece is surrounded by friendly pieces"""
         x, y = piece.position._x, piece.position._y
         era = piece.position._era
@@ -159,17 +146,6 @@ class Board:
         # If we get here, all valid adjacent spaces are occupied by friendly pieces
         return True
 
-    def get_all_valid_moves(self, player: 'PlayerStrategy') -> dict:
-        """Get all valid moves for pieces in the active era"""
-        moves_by_piece = {}
-        active_pieces = player.current_era.getPieces(player)
-        
-        for piece in active_pieces:
-            valid_moves = self.get_moves_for_piece(piece)
-            if valid_moves:  # Only include pieces that can actually move
-                moves_by_piece[piece] = valid_moves
-        
-        return moves_by_piece
 
     def _getEraByName(self, era_name: str):
         """Get era object by name"""
@@ -180,7 +156,7 @@ class Board:
         }
         return era_map.get(era_name.lower())
 
-    def is_valid_move(self, move: 'Move') -> bool:
+    def _is_valid_move(self, move: 'Move') -> bool:
         """Check if a complete move is valid"""
         if not move.piece:  # Era change only move
             return True
@@ -191,7 +167,7 @@ class Board:
         # For each direction in the move
         for i, direction in enumerate(move.directions):
             # Get new position after this direction
-            result = self.get_new_position(current_pos._x, current_pos._y, 
+            result = self._get_new_position(current_pos._x, current_pos._y, 
                                          direction, current_era)
             if result is None:
                 return False
@@ -207,7 +183,7 @@ class Board:
             temp_move = Move(temp_piece, [direction], None, None)
             
             # Check if this individual direction is valid
-            if not self.is_valid_direction(temp_move):
+            if not self._is_valid_direction(temp_move):
                 return False
             
             # Update position for next direction
@@ -216,7 +192,7 @@ class Board:
             
         return True
 
-    def is_valid_direction(self, move: 'Move') -> bool:
+    def _is_valid_direction(self, move: 'Move') -> bool:
         """Check if a single direction move is valid"""
         if not move.piece:
             return False
@@ -225,7 +201,7 @@ class Board:
         direction = move.directions[0]
         
         # Get new position after move
-        result = self.get_new_position(current_pos._x, current_pos._y, 
+        result = self._get_new_position(current_pos._x, current_pos._y, 
                                      direction, current_pos._era)
         if result is None:
             return False

@@ -450,7 +450,7 @@ class HumanPlayer(PlayerStrategy):
             
             # 5. Check if piece can move in that direction
             temp_move = Move(piece, [direction], None, None)
-            if not board.is_valid_direction(temp_move):
+            if not board._is_valid_direction(temp_move):
                 print(f"Cannot move {direction}")
                 continue
             
@@ -466,7 +466,7 @@ class HumanPlayer(PlayerStrategy):
                     continue
                 
                 temp_move = Move(piece, directions + [direction], None, None)
-                if not board.is_valid_move(temp_move):
+                if not board._is_valid_move(temp_move):
                     print(f"Cannot move {direction}")
                     continue
                 

@@ -113,7 +113,7 @@ class Game:
             row_str += f"{symbol}|"
         return row_str
     
-    def undo_redo_decorator(func):
+    def _undo_redo_decorator(func):
         """Decorator to handle undo/redo functionality"""
         def wrapper(self, *args, **kwargs):
             while True:
@@ -229,7 +229,7 @@ class Game:
                         self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                         self.turn_number += 1
                         
-                        self.state = self.get_winner()
+                        self.state = self._get_winner()
                         
                         # Save state after successful move
                         if hasattr(self, 'originator'):
@@ -243,10 +243,10 @@ class Game:
                     break
                     
                 # Reset the game for a new round
-                self.reset_game()
+                self._reset_game()
         return wrapper
     
-    @undo_redo_decorator
+    @_undo_redo_decorator
     def run(self):
         """Main game loop"""
         while True:  # Outer loop for multiple games
@@ -263,7 +263,7 @@ class Game:
                     print(move)
                     self.current_player = self.b_player if self.current_player == self.w_player else self.w_player
                     self.turn_number += 1
-                    game_state = self.get_winner()
+                    game_state = self._get_winner()
                     # Save state after successful move
                     if hasattr(self, 'originator'):
                         self.caretaker.save()
@@ -278,10 +278,10 @@ class Game:
                 break
                 
             # Reset the game for a new round
-            self.reset_game()
+            self._reset_game()
 
     
-    def reset_game(self):
+    def _reset_game(self):
         """Reset the game to initial state"""
         # Store current settings before reset
         white_type = "heuristic" if isinstance(self.w_player, HeuristicAIPlayer) else \
@@ -321,7 +321,7 @@ class Game:
             self.caretaker = Caretaker(self.originator)
             self.caretaker.save()
     
-    def get_winner(self) -> GameState:
+    def _get_winner(self) -> GameState:
         """Determine the winner of the game"""
         w_pieces = 0
         b_pieces = 0

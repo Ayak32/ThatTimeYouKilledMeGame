@@ -125,7 +125,7 @@ class Move:
 
         # Execute each direction
         for direction in self.directions:
-            new_pos = self._get_new_position(current_pos, direction, board)
+            new_pos = self._move_get_new_position(current_pos, direction, board)
             if new_pos is None:
                 return False
                 
@@ -160,9 +160,9 @@ class Move:
         
         return True
 
-    def _get_new_position(self, current_pos: 'Position', direction: str, board: 'Board'):
+    def _move_get_new_position(self, current_pos: 'Position', direction: str, board: 'Board'):
         """Calculate new position after a move in given direction"""
-        result = board.get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
+        result = board._get_new_position(current_pos._x, current_pos._y, direction, current_pos._era)
         if result is None:
             return None
         new_x, new_y, new_era = result
